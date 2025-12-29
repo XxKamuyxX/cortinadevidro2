@@ -37,14 +37,16 @@ export function WorkOrderDetails() {
 
   const loadWorkOrder = async () => {
     try {
-      if (!id) return;
+      if (!id) {
+        setLoading(false);
+        return;
+      }
 
       const docRef = doc(db, 'workOrders', id);
       const docSnap = await getDoc(docRef);
 
       if (!docSnap.exists()) {
-        alert('Ordem de serviço não encontrada');
-        navigate('/work-orders');
+        setLoading(false);
         return;
       }
 
@@ -56,7 +58,6 @@ export function WorkOrderDetails() {
       setNotes(data.notes || '');
     } catch (error) {
       console.error('Error loading work order:', error);
-      alert('Erro ao carregar ordem de serviço');
     } finally {
       setLoading(false);
     }

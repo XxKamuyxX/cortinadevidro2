@@ -2,7 +2,7 @@ import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
-import { Save, Trash2, Download } from 'lucide-react';
+import { Save, Trash2, Download, MessageCircle } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { QuotePDF } from '../components/QuotePDF';
 import { useState, useEffect } from 'react';
@@ -291,6 +291,54 @@ export function QuoteNew() {
     }
   };
 
+  const sanitizePhone = (phone: string): string => {
+    // Remove spaces, parentheses, dashes
+    let cleaned = phone.replace(/[\s\(\)\-]/g, '');
+    
+    // Remove leading + if exists
+    if (cleaned.startsWith('+')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // If doesn't start with '55', add Brazil country code
+    if (!cleaned.startsWith('55')) {
+      cleaned = '55' + cleaned;
+    }
+    
+    return cleaned;
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!selectedClientId || !id) {
+      alert('Salve o orçamento antes de enviar no WhatsApp');
+      return;
+    }
+
+    const selectedClient = clients.find((c) => c.id === selectedClientId);
+    if (!selectedClient) {
+      alert('Cliente não encontrado');
+      return;
+    }
+
+    if (!selectedClient.phone || selectedClient.phone.trim() === '') {
+      alert('Cliente sem telefone cadastrado');
+      return;
+    }
+
+    try {
+      const phone = sanitizePhone(selectedClient.phone);
+      const publicLink = `${window.location.origin}/p/${id}`;
+      const message = `Olá ${selectedClient.name}, aqui está o link do seu orçamento na House Manutenção: ${publicLink}`;
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
+      
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      alert('Erro ao abrir WhatsApp');
+    }
+  };
+
   const handleGeneratePDF = async () => {
     if (!selectedClientId || items.length === 0) {
       alert('Complete o orçamento antes de gerar o PDF');
@@ -358,6 +406,17 @@ export function QuoteNew() {
             <Button variant="outline" onClick={() => navigate('/quotes')}>
               Cancelar
             </Button>
+            {id && (
+              <Button
+                variant="primary"
+                onClick={handleSendWhatsApp}
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                disabled={!selectedClientId || !id}
+              >
+                <MessageCircle className="w-5 h-5" />
+                Enviar no WhatsApp
+              </Button>
+            )}
             <Button
               variant="secondary"
               onClick={handleGeneratePDF}

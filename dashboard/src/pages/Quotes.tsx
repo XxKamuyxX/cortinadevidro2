@@ -1,11 +1,12 @@
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Plus, FileText, ClipboardList } from 'lucide-react';
+import { Plus, FileText, ClipboardList, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Link, useNavigate } from 'react-router-dom';
+import { DatePickerModal } from '../components/DatePickerModal';
 
 interface Quote {
   id: string;
@@ -32,6 +33,8 @@ const statusColors = {
 export function Quotes() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -60,21 +63,86 @@ export function Quotes() {
     }).format(value);
   };
 
-  const convertToWorkOrder = async (quote: Quote) => {
+  const sanitizePhone = (phone: string): string => {
+    if (!phone) return '';
+    // Remove spaces, parentheses, dashes
+    let cleaned = phone.replace(/[\s\(\)\-]/g, '');
+    
+    // Remove leading + if exists
+    if (cleaned.startsWith('+')) {
+      cleaned = cleaned.substring(1);
+    }
+    
+    // If doesn't start with '55', add Brazil country code
+    if (!cleaned.startsWith('55')) {
+      cleaned = '55' + cleaned;
+    }
+    
+    return cleaned;
+  };
+
+  const handleSendWhatsApp = async (quote: Quote) => {
+    try {
+      // Get client phone from quote or fetch client
+      const quoteDoc = await getDoc(doc(db, 'quotes', quote.id));
+      if (!quoteDoc.exists()) {
+        alert('Orçamento não encontrado');
+        return;
+      }
+
+      const quoteData = quoteDoc.data();
+      const clientId = quoteData.clientId;
+      
+      if (!clientId) {
+        alert('Cliente não encontrado no orçamento');
+        return;
+      }
+
+      const clientDoc = await getDoc(doc(db, 'clients', clientId));
+      if (!clientDoc.exists()) {
+        alert('Cliente não encontrado');
+        return;
+      }
+
+      const clientData = clientDoc.data();
+      const phone = clientData.phone;
+
+      if (!phone || phone.trim() === '') {
+        alert('Cliente sem telefone cadastrado');
+        return;
+      }
+
+      const sanitizedPhone = sanitizePhone(phone);
+      const publicLink = `${window.location.origin}/p/${quote.id}`;
+      const message = `Olá ${quote.clientName}, aqui está o link do seu orçamento na House Manutenção: ${publicLink}`;
+      const encodedMessage = encodeURIComponent(message);
+      const whatsappUrl = `https://wa.me/${sanitizedPhone}?text=${encodedMessage}`;
+      
+      window.open(whatsappUrl, '_blank');
+    } catch (error) {
+      console.error('Error sending WhatsApp:', error);
+      alert('Erro ao abrir WhatsApp');
+    }
+  };
+
+  const convertToWorkOrder = (quote: Quote) => {
     if (quote.status !== 'approved') {
       alert('Apenas orçamentos aprovados podem ser convertidos em Ordem de Serviço');
       return;
     }
 
-    if (!confirm('Deseja converter este orçamento em Ordem de Serviço?')) {
-      return;
-    }
+    setSelectedQuote(quote);
+    setShowDatePicker(true);
+  };
+
+  const handleDateConfirm = async (date: Date) => {
+    if (!selectedQuote) return;
 
     try {
       const workOrderData = {
-        quoteId: quote.id,
-        clientName: quote.clientName,
-        scheduledDate: new Date().toISOString(),
+        quoteId: selectedQuote.id,
+        clientName: selectedQuote.clientName,
+        scheduledDate: date.toISOString(),
         technician: '',
         status: 'scheduled',
         checklist: [
@@ -89,6 +157,8 @@ export function Quotes() {
 
       await addDoc(collection(db, 'workOrders'), workOrderData);
       alert('Ordem de Serviço criada com sucesso!');
+      setShowDatePicker(false);
+      setSelectedQuote(null);
       navigate('/work-orders');
     } catch (error) {
       console.error('Error creating work order:', error);
@@ -145,6 +215,15 @@ export function Quotes() {
                         Ver
                       </Button>
                     </Link>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => handleSendWhatsApp(quote)}
+                      className="flex items-center gap-1 bg-green-600 hover:bg-green-700"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      WhatsApp
+                    </Button>
                     {quote.status === 'approved' && (
                       <Button
                         variant="secondary"
@@ -161,6 +240,18 @@ export function Quotes() {
               </Card>
             ))}
           </div>
+        )}
+
+        {showDatePicker && (
+          <DatePickerModal
+            onConfirm={handleDateConfirm}
+            onCancel={() => {
+              setShowDatePicker(false);
+              setSelectedQuote(null);
+            }}
+            title="Agendar Ordem de Serviço"
+            message="Selecione a data para agendar a ordem de serviço:"
+          />
         )}
       </div>
     </Layout>

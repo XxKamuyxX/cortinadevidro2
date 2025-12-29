@@ -1,9 +1,11 @@
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
-import { DollarSign, TrendingUp, CreditCard, Receipt, Target } from 'lucide-react';
+import { Button } from '../components/ui/Button';
+import { DollarSign, TrendingUp, CreditCard, Receipt, Target, Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { ExpenseModal } from '../components/ExpenseModal';
 
 interface FinanceStats {
   faturamento: number;
@@ -41,6 +43,7 @@ export function Finance() {
   });
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'month' | 'year'>('month');
+  const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   useEffect(() => {
     loadFinanceData();
@@ -48,19 +51,47 @@ export function Finance() {
 
   const loadFinanceData = async () => {
     try {
-      // Carregar orçamentos aprovados (faturamento)
-      const quotesSnapshot = await getDocs(collection(db, 'quotes'));
-      const approvedQuotes = quotesSnapshot.docs
-        .map((doc) => doc.data())
-        .filter((quote) => quote.status === 'approved');
+      // Carregar receitas baseadas em OS concluídas (com completedDate)
+      const now = new Date();
+      const startOfPeriod = period === 'month' 
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : new Date(now.getFullYear(), 0, 1);
+      const endOfPeriod = period === 'month'
+        ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+        : new Date(now.getFullYear(), 11, 31, 23, 59, 59);
 
-      const faturamento = approvedQuotes.reduce((sum, quote) => sum + (quote.total || 0), 0);
-      const valoresAReceber = approvedQuotes
-        .filter((quote) => !quote.paid)
-        .reduce((sum, quote) => sum + (quote.total || 0), 0);
-      const recebido = approvedQuotes
-        .filter((quote) => quote.paid)
-        .reduce((sum, quote) => sum + (quote.total || 0), 0);
+      const workOrdersSnapshot = await getDocs(collection(db, 'workOrders'));
+      const completedOrders = workOrdersSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() }))
+        .filter((wo: any) => {
+          if (wo.status !== 'completed') return false;
+          const completedDate = wo.completedDate?.toDate ? wo.completedDate.toDate() : null;
+          if (!completedDate) return false;
+          return completedDate >= startOfPeriod && completedDate <= endOfPeriod;
+        });
+
+      // Get quote totals for completed orders
+      const quotesSnapshot = await getDocs(collection(db, 'quotes'));
+      const quotesMap = new Map();
+      quotesSnapshot.docs.forEach((doc) => {
+        quotesMap.set(doc.id, doc.data());
+      });
+
+      let faturamento = 0;
+      let recebido = 0;
+      let valoresAReceber = 0;
+
+      completedOrders.forEach((order: any) => {
+        const quote = quotesMap.get(order.quoteId);
+        if (quote && quote.total) {
+          faturamento += quote.total || 0;
+          if (quote.paid) {
+            recebido += quote.total || 0;
+          } else {
+            valoresAReceber += quote.total || 0;
+          }
+        }
+      });
 
       // Carregar despesas (collection 'expenses')
       let contasAPagar = 0;
@@ -73,10 +104,24 @@ export function Finance() {
       let outrasDespesas = 0;
 
       try {
+        const now = new Date();
+        const startOfPeriod = period === 'month' 
+          ? new Date(now.getFullYear(), now.getMonth(), 1)
+          : new Date(now.getFullYear(), 0, 1);
+        const endOfPeriod = period === 'month'
+          ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+          : new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+
         const expensesSnapshot = await getDocs(collection(db, 'expenses'));
         expensesSnapshot.docs.forEach((doc) => {
           const expense = doc.data();
           const amount = expense.amount || 0;
+          const paymentDate = expense.paymentDate?.toDate ? expense.paymentDate.toDate() : null;
+          
+          // Filter by period if paymentDate exists
+          if (paymentDate && (paymentDate < startOfPeriod || paymentDate > endOfPeriod)) {
+            return;
+          }
 
           if (expense.paid) {
             contasPagas += amount;
@@ -151,6 +196,30 @@ export function Finance() {
     return `${value.toFixed(2)}%`;
   };
 
+  const handleSaveExpense = async (expense: {
+    description: string;
+    amount: number;
+    category: string;
+    paymentDate: Date;
+    paid: boolean;
+  }) => {
+    try {
+      await addDoc(collection(db, 'expenses'), {
+        description: expense.description,
+        amount: expense.amount,
+        category: expense.category,
+        paymentDate: Timestamp.fromDate(expense.paymentDate),
+        paid: expense.paid,
+        createdAt: Timestamp.now(),
+      });
+      setShowExpenseModal(false);
+      loadFinanceData();
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      alert('Erro ao salvar despesa');
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -171,6 +240,14 @@ export function Finance() {
             <p className="text-slate-600 mt-1">Gestão financeira completa</p>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="primary"
+              onClick={() => setShowExpenseModal(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Nova Despesa
+            </Button>
             <button
               onClick={() => setPeriod('month')}
               className={`px-4 py-2 rounded-lg transition-colors ${
@@ -327,6 +404,13 @@ export function Finance() {
           </div>
         </Card>
       </div>
+
+      {showExpenseModal && (
+        <ExpenseModal
+          onSave={handleSaveExpense}
+          onCancel={() => setShowExpenseModal(false)}
+        />
+      )}
     </Layout>
   );
 }

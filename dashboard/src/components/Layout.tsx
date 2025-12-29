@@ -21,7 +21,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { signOut, user } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -52,9 +52,6 @@ export function Layout({ children }: LayoutProps) {
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center gap-3">
               <img src="/logo.png" alt="House Manutenção" className="h-8 w-auto" />
-              <span className="text-xl font-serif font-bold text-navy hidden sm:inline">
-                House Manutenção
-              </span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -80,9 +77,6 @@ export function Layout({ children }: LayoutProps) {
 
             {/* User & Mobile Menu */}
             <div className="flex items-center gap-4">
-              <div className="hidden md:block text-sm text-slate-600">
-                {user?.email}
-              </div>
               <Button
                 variant="ghost"
                 size="sm"
