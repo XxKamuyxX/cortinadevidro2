@@ -26,16 +26,18 @@ interface Quote {
 
 export function PublicQuote() {
   const { quoteId } = useParams<{ quoteId: string }>();
+  // Support both /p/:quoteId and /p/quote/:quoteId
+  const actualQuoteId = quoteId;
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (quoteId) {
+    if (actualQuoteId) {
       loadQuote();
     }
-  }, [quoteId]);
+  }, [actualQuoteId]);
 
   const loadQuote = async () => {
     try {
@@ -45,7 +47,7 @@ export function PublicQuote() {
         return;
       }
 
-      const quoteDoc = await getDoc(doc(db, 'quotes', quoteId));
+      const quoteDoc = await getDoc(doc(db, 'quotes', actualQuoteId));
       if (!quoteDoc.exists()) {
         setError('Orçamento não encontrado');
         setLoading(false);
@@ -93,7 +95,8 @@ export function PublicQuote() {
   };
 
   const handleReject = async () => {
-    if (!quoteId || !quote) return;
+    const idToUse = actualQuoteId;
+    if (!idToUse || !quote) return;
 
     if (quote.status === 'rejected') {
       alert('Este orçamento já foi rejeitado');
@@ -106,7 +109,7 @@ export function PublicQuote() {
 
     setUpdating(true);
     try {
-      await updateDoc(doc(db, 'quotes', quoteId), {
+      await updateDoc(doc(db, 'quotes', idToUse), {
         status: 'rejected',
         updatedAt: new Date(),
       });

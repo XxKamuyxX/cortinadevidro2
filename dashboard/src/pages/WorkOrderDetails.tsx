@@ -3,9 +3,12 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { CheckCircle2, Circle, X, Plus, Copy, ExternalLink } from 'lucide-react';
+import { CheckCircle2, Circle, X, Plus, Copy, ExternalLink, FileText, ClipboardCheck } from 'lucide-react';
+import { ImageUpload } from '../components/ImageUpload';
+import { TechnicalInspection } from '../components/TechnicalInspection';
+import { WhatsAppButton } from '../components/WhatsAppButton';
 
 interface WorkOrder {
   id: string;
@@ -18,6 +21,11 @@ interface WorkOrder {
   notes: string;
   photos?: string[];
   feedbackLink?: string;
+  technicalInspection?: {
+    leaves: any[];
+    generalChecklist: { task: string; completed: boolean }[];
+  };
+  clientPhone?: string;
 }
 
 export function WorkOrderDetails() {
@@ -26,8 +34,11 @@ export function WorkOrderDetails() {
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [activeTab, setActiveTab] = useState<'info' | 'inspection' | 'photos'>('info');
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptAmount, setReceiptAmount] = useState(0);
+  const [clientPhone, setClientPhone] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -56,6 +67,21 @@ export function WorkOrderDetails() {
         ...data,
       } as WorkOrder);
       setNotes(data.notes || '');
+      setClientPhone(data.clientPhone || '');
+
+      // Load client phone from quote if not in workOrder
+      if (!data.clientPhone && data.quoteId) {
+        const quoteDoc = await getDoc(doc(db, 'quotes', data.quoteId));
+        if (quoteDoc.exists()) {
+          const quoteData = quoteDoc.data();
+          if (quoteData.clientId) {
+            const clientDoc = await getDoc(doc(db, 'clients', quoteData.clientId));
+            if (clientDoc.exists()) {
+              setClientPhone(clientDoc.data().phone || '');
+            }
+          }
+        }
+      }
     } catch (error) {
       console.error('Error loading work order:', error);
     } finally {
@@ -63,10 +89,10 @@ export function WorkOrderDetails() {
     }
   };
 
-  const handleAddPhoto = async () => {
-    if (!newPhotoUrl.trim() || !id || !workOrder) return;
+  const handlePhotoUpload = async (url: string) => {
+    if (!id || !workOrder) return;
 
-    const updatedPhotos = [...(workOrder.photos || []), newPhotoUrl.trim()];
+    const updatedPhotos = [...(workOrder.photos || []), url];
     
     setSaving(true);
     try {
@@ -74,12 +100,75 @@ export function WorkOrderDetails() {
         photos: updatedPhotos,
       });
       setWorkOrder({ ...workOrder, photos: updatedPhotos });
-      setNewPhotoUrl('');
     } catch (error) {
       console.error('Error adding photo:', error);
       alert('Erro ao adicionar foto');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveInspection = async (data: {
+    leaves: any[];
+    generalChecklist: { task: string; completed: boolean }[];
+  }) => {
+    if (!id || !workOrder) return;
+
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'workOrders', id), {
+        technicalInspection: data,
+      });
+      setWorkOrder({ ...workOrder, technicalInspection: data });
+      alert('Vistoria salva com sucesso!');
+    } catch (error) {
+      console.error('Error saving inspection:', error);
+      alert('Erro ao salvar vistoria');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleGenerateReceipt = async () => {
+    if (!id || !workOrder || receiptAmount <= 0) {
+      alert('Digite um valor válido');
+      return;
+    }
+
+    try {
+      // Get quote data
+      let quoteData: any = null;
+      if (workOrder.quoteId) {
+        const quoteDoc = await getDoc(doc(db, 'quotes', workOrder.quoteId));
+        if (quoteDoc.exists()) {
+          quoteData = quoteDoc.data();
+        }
+      }
+
+      const receiptData = {
+        workOrderId: id,
+        clientName: workOrder.clientName,
+        amount: receiptAmount,
+        paymentDate: new Date(),
+        items: quoteData?.items || [],
+        notes: workOrder.notes || '',
+        createdAt: new Date(),
+      };
+
+      const receiptRef = await addDoc(collection(db, 'receipts'), receiptData);
+      const receiptLink = `${window.location.origin}/p/receipt/${receiptRef.id}`;
+
+      // Update workOrder with receipt link
+      await updateDoc(doc(db, 'workOrders', id), {
+        receiptLink,
+      });
+
+      setShowReceiptModal(false);
+      alert('Recibo gerado com sucesso!');
+      window.open(receiptLink, '_blank');
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      alert('Erro ao gerar recibo');
     }
   };
 
@@ -349,66 +438,136 @@ export function WorkOrderDetails() {
           </Card>
         </div>
 
-        {/* Photo Report */}
-        <Card>
-          <h2 className="text-xl font-bold text-navy mb-4">Relatório Fotográfico</h2>
-          
-          {/* Add Photo */}
-          <div className="mb-6 p-4 border-2 border-dashed border-slate-300 rounded-lg">
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Adicionar Foto (URL)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newPhotoUrl}
-                onChange={(e) => setNewPhotoUrl(e.target.value)}
-                placeholder="Cole a URL da imagem aqui"
-                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-              />
-              <Button
-                variant="primary"
-                onClick={handleAddPhoto}
-                disabled={!newPhotoUrl.trim() || saving}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar
-              </Button>
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              💡 Dica: Você pode usar serviços como Imgur, Google Drive (com link público), ou qualquer hospedagem de imagens.
-            </p>
+        {/* Tabs */}
+        <div className="border-b border-slate-200">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'info'
+                  ? 'border-b-2 border-navy text-navy'
+                  : 'text-slate-600 hover:text-navy'
+              }`}
+            >
+              <FileText className="w-5 h-5 inline mr-2" />
+              Informações
+            </button>
+            <button
+              onClick={() => setActiveTab('inspection')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'inspection'
+                  ? 'border-b-2 border-navy text-navy'
+                  : 'text-slate-600 hover:text-navy'
+              }`}
+            >
+              <ClipboardCheck className="w-5 h-5 inline mr-2" />
+              Vistoria Técnica
+            </button>
+            <button
+              onClick={() => setActiveTab('photos')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'photos'
+                  ? 'border-b-2 border-navy text-navy'
+                  : 'text-slate-600 hover:text-navy'
+              }`}
+            >
+              <Plus className="w-5 h-5 inline mr-2" />
+              Fotos
+            </button>
           </div>
+        </div>
 
-          {/* Photos Grid */}
-          {workOrder.photos && workOrder.photos.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {workOrder.photos.map((photoUrl, index) => (
-                <div key={index} className="relative group">
-                  <img
-                    src={photoUrl}
-                    alt={`Foto ${index + 1}`}
-                    className="w-full h-48 object-cover rounded-lg border border-slate-200"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Imagem+Inválida';
-                    }}
+        {/* Tab Content */}
+        {activeTab === 'info' && (
+          <>
+            {/* WhatsApp Button */}
+            {workOrder.status === 'completed' && (
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-navy mb-2">Compartilhar OS</h2>
+                    <p className="text-sm text-slate-600">
+                      Envie o link da ordem de serviço para o cliente via WhatsApp
+                    </p>
+                  </div>
+                  <WhatsAppButton
+                    phoneNumber={clientPhone}
+                    clientName={workOrder.clientName}
+                    docType="OS"
+                    docLink={`${window.location.origin}/p/os/${id}`}
                   />
-                  <button
-                    onClick={() => handleRemovePhoto(index)}
-                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
-              ))}
+              </Card>
+            )}
+
+            {/* Generate Receipt */}
+            {workOrder.status === 'completed' && (
+              <Card>
+                <h2 className="text-xl font-bold text-navy mb-4">Gerar Recibo</h2>
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowReceiptModal(true)}
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="w-5 h-5" />
+                  Gerar Recibo
+                </Button>
+              </Card>
+            )}
+          </>
+        )}
+
+        {activeTab === 'inspection' && (
+          <TechnicalInspection
+            initialLeaves={workOrder.technicalInspection?.leaves || []}
+            initialGeneralChecklist={workOrder.technicalInspection?.generalChecklist || []}
+            onSave={handleSaveInspection}
+          />
+        )}
+
+        {activeTab === 'photos' && (
+          <Card>
+            <h2 className="text-xl font-bold text-navy mb-4">Relatório Fotográfico</h2>
+            
+            {/* Image Upload */}
+            <div className="mb-6">
+              <ImageUpload
+                onUploadComplete={handlePhotoUpload}
+                path={`work-orders/${id}/photos`}
+                label="Adicionar Foto"
+              />
             </div>
-          ) : (
-            <div className="text-center py-8 text-slate-600">
-              <p>Nenhuma foto adicionada ainda.</p>
-              <p className="text-sm mt-2">Adicione fotos do serviço realizado acima.</p>
-            </div>
-          )}
-        </Card>
+
+            {/* Photos Grid */}
+            {workOrder.photos && workOrder.photos.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {workOrder.photos.map((photoUrl, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={photoUrl}
+                      alt={`Foto ${index + 1}`}
+                      className="w-full h-48 object-cover rounded-lg border border-slate-200"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Imagem+Inválida';
+                      }}
+                    />
+                    <button
+                      onClick={() => handleRemovePhoto(index)}
+                      className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-600">
+                <p>Nenhuma foto adicionada ainda.</p>
+                <p className="text-sm mt-2">Adicione fotos do serviço realizado acima.</p>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Notes */}
         <Card>
@@ -426,6 +585,46 @@ export function WorkOrderDetails() {
             </Button>
           </div>
         </Card>
+
+        {/* Receipt Modal */}
+        {showReceiptModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-navy">Gerar Recibo</h2>
+                <button
+                  onClick={() => setShowReceiptModal(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Valor do Recibo (R$)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={receiptAmount}
+                    onChange={(e) => setReceiptAmount(parseFloat(e.target.value) || 0)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  />
+                </div>
+                <div className="flex gap-4">
+                  <Button variant="primary" onClick={handleGenerateReceipt} className="flex-1">
+                    Gerar Recibo
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowReceiptModal(false)} className="flex-1">
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );

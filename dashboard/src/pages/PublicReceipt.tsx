@@ -1,0 +1,223 @@
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { Loader2, Download } from 'lucide-react';
+import { pdf } from '@react-pdf/renderer';
+import { ReceiptPDF } from '../components/ReceiptPDF';
+
+interface Receipt {
+  id: string;
+  workOrderId: string;
+  clientName: string;
+  amount: number;
+  paymentDate: any;
+  items?: any[];
+  notes?: string;
+}
+
+export function PublicReceipt() {
+  const { receiptId } = useParams<{ receiptId: string }>();
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
+  const [workOrder, setWorkOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (receiptId) {
+      loadReceipt();
+    }
+  }, [receiptId]);
+
+  const loadReceipt = async () => {
+    try {
+      if (!receiptId) {
+        setError('ID do recibo não fornecido');
+        setLoading(false);
+        return;
+      }
+
+      const receiptDoc = await getDoc(doc(db, 'receipts', receiptId));
+      if (!receiptDoc.exists()) {
+        setError('Recibo não encontrado');
+        setLoading(false);
+        return;
+      }
+
+      const receiptData = receiptDoc.data();
+      setReceipt({
+        id: receiptDoc.id,
+        ...receiptData,
+      } as Receipt);
+
+      // Load work order if available
+      if (receiptData.workOrderId) {
+        const woDoc = await getDoc(doc(db, 'workOrders', receiptData.workOrderId));
+        if (woDoc.exists()) {
+          setWorkOrder(woDoc.data());
+        }
+      }
+    } catch (err) {
+      console.error('Error loading receipt:', err);
+      setError('Erro ao carregar recibo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!receipt || !workOrder) return;
+
+    try {
+      const doc = (
+        <ReceiptPDF
+          clientName={receipt.clientName}
+          workOrderId={workOrder.id || receipt.workOrderId}
+          scheduledDate={workOrder.scheduledDate || new Date().toISOString()}
+          completedDate={receipt.paymentDate?.toDate ? receipt.paymentDate.toDate() : new Date()}
+          technician={workOrder.technician || ''}
+          checklist={workOrder.checklist || []}
+          notes={receipt.notes || workOrder.notes || ''}
+          items={receipt.items || []}
+          total={receipt.amount}
+          warranty={workOrder.warranty}
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Recibo_${receipt.clientName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF');
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  const formatDate = (date: any) => {
+    if (!date) return '';
+    const d = date.toDate ? date.toDate() : new Date(date);
+    return d.toLocaleDateString('pt-BR');
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-navy animate-spin mx-auto mb-4" />
+          <p className="text-slate-600">Carregando recibo...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !receipt) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+          <h1 className="text-2xl font-bold text-navy mb-2">Erro</h1>
+          <p className="text-slate-600 mb-6">{error || 'Recibo não encontrado'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-center">
+              <img src="/logo.png" alt="House Manutenção" className="h-16 w-16 object-contain" />
+            </div>
+            <button
+              onClick={handleDownloadPDF}
+              className="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy-800 transition-colors flex items-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              Download PDF
+            </button>
+          </div>
+          <h1 className="text-3xl font-bold text-navy text-center mb-2">Recibo de Pagamento</h1>
+          <p className="text-center text-slate-600">
+            {receipt.paymentDate && `Emitido em ${formatDate(receipt.paymentDate)}`}
+          </p>
+        </div>
+
+        {/* Client Info */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-bold text-navy mb-4">Cliente</h2>
+          <p className="text-lg text-slate-700">{receipt.clientName}</p>
+        </div>
+
+        {/* Payment Info */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-xl font-bold text-navy mb-4">Informações de Pagamento</h2>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Valor Pago:</span>
+              <span className="font-bold text-navy text-xl">{formatCurrency(receipt.amount)}</span>
+            </div>
+            {receipt.paymentDate && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Data do Pagamento:</span>
+                <span className="font-medium text-navy">{formatDate(receipt.paymentDate)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Services */}
+        {receipt.items && receipt.items.length > 0 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-bold text-navy mb-4">Serviços</h2>
+            <div className="space-y-4">
+              {receipt.items.map((item: any, index: number) => (
+                <div key={index} className="border-b border-slate-200 pb-4 last:border-0">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-navy">{item.serviceName}</h3>
+                      <p className="text-sm text-slate-600">
+                        {item.quantity}x {formatCurrency(item.unitPrice)}
+                      </p>
+                    </div>
+                    <p className="font-bold text-navy">{formatCurrency(item.total)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        {receipt.notes && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-bold text-navy mb-4">Observações</h2>
+            <p className="text-slate-700">{receipt.notes}</p>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="text-center mt-8 text-slate-600 text-sm">
+          <p>House Manutenção - Especialistas em Cortinas de Vidro</p>
+          <p className="mt-1">Rua Rio Grande do Norte, 726, Savassi, Belo Horizonte - MG</p>
+          <p className="mt-1">Telefone: (31) 98279-8513</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
