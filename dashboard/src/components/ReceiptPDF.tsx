@@ -341,8 +341,8 @@ export function ReceiptPDF({
             </Text>
             {checklist.map((item, index) => (
               <View key={index} style={styles.checklistItem}>
-                <Text style={{ marginRight: 5 }}>{item.completed ? '✓' : '○'}</Text>
-                <Text style={item.completed ? styles.checklistCompleted : {}}>
+                <Text style={{ marginRight: 5, fontSize: 10 }}>{item.completed ? '✓' : '○'}</Text>
+                <Text style={[item.completed ? styles.checklistCompleted : {}, { fontSize: 10 }]}>
                   {item.task}
                 </Text>
               </View>

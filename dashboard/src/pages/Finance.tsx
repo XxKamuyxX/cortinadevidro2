@@ -1,11 +1,12 @@
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { DollarSign, TrendingUp, CreditCard, Receipt, Target, Plus } from 'lucide-react';
+import { DollarSign, TrendingUp, CreditCard, Receipt, Target, Plus, Users, BarChart3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ExpenseModal } from '../components/ExpenseModal';
+import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface FinanceStats {
   faturamento: number;
@@ -22,6 +23,13 @@ interface FinanceStats {
   estacionamento: number;
   ferramentas: number;
   outrasDespesas: number;
+  ticketMedio: number;
+  quantidadeClientes: number;
+  taxaConversao: number;
+  quantidadeOrcamentos: number;
+  quantidadeOS: number;
+  origemClientes: { [key: string]: number };
+  faturamentoPorMes: { mes: string; valor: number }[];
 }
 
 export function Finance() {
@@ -40,6 +48,13 @@ export function Finance() {
     estacionamento: 0,
     ferramentas: 0,
     outrasDespesas: 0,
+    ticketMedio: 0,
+    quantidadeClientes: 0,
+    taxaConversao: 0,
+    quantidadeOrcamentos: 0,
+    quantidadeOS: 0,
+    origemClientes: {},
+    faturamentoPorMes: [],
   });
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'month' | 'year'>('month');
@@ -162,6 +177,60 @@ export function Finance() {
       const lucroLiquido = faturamento - custos - investimentoMarketing;
       const margemLiquida = faturamento > 0 ? (lucroLiquido / faturamento) * 100 : 0;
 
+      // Calcular KPIs adicionais
+      const clientsSnapshot = await getDocs(collection(db, 'clients'));
+      const allClients = clientsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const quantidadeClientes = allClients.length;
+      
+      // Origem dos clientes
+      const origemClientes: { [key: string]: number } = {};
+      allClients.forEach((client: any) => {
+        const origem = client.origin || 'Não informado';
+        origemClientes[origem] = (origemClientes[origem] || 0) + 1;
+      });
+
+      // Quantidade de orçamentos e OS
+      const allQuotes = quotesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const quantidadeOrcamentos = allQuotes.length;
+      const quantidadeOS = workOrdersSnapshot.docs.length;
+      
+      // Taxa de conversão (OS aprovadas / Orçamentos totais)
+      const orcamentosAprovados = allQuotes.filter((q: any) => q.status === 'approved').length;
+      const taxaConversao = quantidadeOrcamentos > 0 ? (orcamentosAprovados / quantidadeOrcamentos) * 100 : 0;
+
+      // Ticket médio (faturamento / quantidade de OS concluídas)
+      const ticketMedio = completedOrders.length > 0 ? faturamento / completedOrders.length : 0;
+
+      // Faturamento por mês (últimos 6 meses)
+      const faturamentoPorMes: { mes: string; valor: number }[] = [];
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
+        
+        const monthOrders = workOrdersSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((wo: any) => {
+            if (wo.status !== 'completed') return false;
+            const completedDate = wo.completedDate?.toDate ? wo.completedDate.toDate() : null;
+            if (!completedDate) return false;
+            return completedDate >= monthStart && completedDate <= monthEnd;
+          });
+
+        let monthRevenue = 0;
+        monthOrders.forEach((order: any) => {
+          const quote = quotesMap.get(order.quoteId);
+          if (quote && quote.total) {
+            monthRevenue += quote.total || 0;
+          }
+        });
+
+        faturamentoPorMes.push({
+          mes: date.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
+          valor: monthRevenue,
+        });
+      }
+
       setStats({
         faturamento,
         contasAPagar,
@@ -177,6 +246,13 @@ export function Finance() {
         estacionamento,
         ferramentas,
         outrasDespesas,
+        ticketMedio,
+        quantidadeClientes,
+        taxaConversao,
+        quantidadeOrcamentos,
+        quantidadeOS,
+        origemClientes,
+        faturamentoPorMes,
       });
     } catch (error) {
       console.error('Error loading finance data:', error);
@@ -390,6 +466,134 @@ export function Finance() {
                 <Target className="w-8 h-8 text-gold-600" />
               </div>
             </div>
+          </Card>
+
+          {/* Ticket Médio */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Ticket Médio</p>
+                <p className="text-3xl font-bold text-navy">{formatCurrency(stats.ticketMedio)}</p>
+              </div>
+              <div className="bg-indigo-100 rounded-full p-3">
+                <BarChart3 className="w-8 h-8 text-indigo-600" />
+              </div>
+            </div>
+          </Card>
+
+          {/* Quantidade de Clientes */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Total de Clientes</p>
+                <p className="text-3xl font-bold text-navy">{stats.quantidadeClientes}</p>
+              </div>
+              <div className="bg-blue-100 rounded-full p-3">
+                <Users className="w-8 h-8 text-blue-600" />
+              </div>
+            </div>
+          </Card>
+
+          {/* Taxa de Conversão */}
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Taxa de Conversão</p>
+                <p className="text-3xl font-bold text-green-600">{formatPercent(stats.taxaConversao)}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {stats.quantidadeOrcamentos} orçamentos, {stats.quantidadeOS} OS
+                </p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <Target className="w-8 h-8 text-green-600" />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Gráficos */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Faturamento por Mês */}
+          <Card>
+            <h2 className="text-xl font-bold text-navy mb-4">Faturamento (Últimos 6 Meses)</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={stats.faturamentoPorMes}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="mes" />
+                <YAxis />
+                <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''} />
+                <Legend />
+                <Line type="monotone" dataKey="valor" stroke="#0F172A" strokeWidth={2} name="Faturamento" />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Origem dos Clientes */}
+          <Card>
+            <h2 className="text-xl font-bold text-navy mb-4">Origem dos Clientes</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <RechartsPieChart>
+                <Pie
+                  data={Object.entries(stats.origemClientes).map(([name, value]) => ({ name, value }))}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ name, percent }) => `${name}: ${percent ? (percent * 100).toFixed(0) : 0}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {Object.entries(stats.origemClientes).map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={['#0F172A', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][index % 6]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </RechartsPieChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Despesas por Categoria */}
+          <Card>
+            <h2 className="text-xl font-bold text-navy mb-4">Despesas por Categoria</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={[
+                { name: 'Marketing', valor: stats.investimentoMarketing },
+                { name: 'Mão de Obra', valor: stats.maoDeObra },
+                { name: 'Alimentação', valor: stats.alimentacao },
+                { name: 'Estacionamento', valor: stats.estacionamento },
+                { name: 'Ferramentas', valor: stats.ferramentas },
+                { name: 'Outras', valor: stats.outrasDespesas },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''} />
+                <Legend />
+                <Bar dataKey="valor" fill="#0F172A" name="Valor" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Resumo Financeiro */}
+          <Card>
+            <h2 className="text-xl font-bold text-navy mb-4">Resumo Financeiro</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={[
+                { name: 'Faturamento', valor: stats.faturamento },
+                { name: 'Recebido', valor: stats.recebido },
+                { name: 'A Receber', valor: stats.valoresAReceber },
+                { name: 'Despesas', valor: stats.contasPagas },
+                { name: 'Lucro', valor: stats.lucroLiquido },
+              ]}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value: number | undefined) => value !== undefined ? formatCurrency(value) : ''} />
+                <Legend />
+                <Bar dataKey="valor" fill="#10B981" name="Valor" />
+              </BarChart>
+            </ResponsiveContainer>
           </Card>
         </div>
 

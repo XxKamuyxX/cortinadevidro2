@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { CheckCircle2, Circle, X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Send } from 'lucide-react';
+import { X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Send } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
 import { TechnicalInspection } from '../components/TechnicalInspection';
 import { WhatsAppButton } from '../components/WhatsAppButton';
@@ -267,25 +267,7 @@ export function WorkOrderDetails() {
     }
   };
 
-  const handleToggleChecklist = async (index: number) => {
-    if (!id || !workOrder || !workOrder.checklist) return;
-
-    const updatedChecklist = [...workOrder.checklist];
-    updatedChecklist[index].completed = !updatedChecklist[index].completed;
-
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, 'workOrders', id), {
-        checklist: updatedChecklist,
-      });
-      setWorkOrder({ ...workOrder, checklist: updatedChecklist });
-    } catch (error) {
-      console.error('Error updating checklist:', error);
-      alert('Erro ao atualizar checklist');
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Removido handleToggleChecklist - checklist removido da parte de informações
 
   const handleStatusChange = async (newStatus: 'scheduled' | 'in-progress' | 'completed') => {
     if (!id || !workOrder) return;
@@ -507,34 +489,6 @@ export function WorkOrderDetails() {
                   </p>
                 )}
               </div>
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="text-xl font-bold text-navy mb-4">Checklist</h2>
-            <div className="space-y-2">
-              {workOrder.checklist && workOrder.checklist.length > 0 ? (
-                workOrder.checklist.map((item, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer"
-                    onClick={() => handleToggleChecklist(index)}
-                  >
-                    {item.completed ? (
-                      <CheckCircle2 className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <Circle className="w-5 h-5 text-slate-300" />
-                    )}
-                    <span
-                      className={item.completed ? 'text-slate-600 line-through' : 'text-slate-700'}
-                    >
-                      {item.task}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p className="text-slate-600">Nenhum item no checklist</p>
-              )}
             </div>
           </Card>
         </div>
