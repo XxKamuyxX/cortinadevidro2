@@ -9,6 +9,7 @@ import { WorkOrders } from './pages/WorkOrders';
 import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
 import { Calendar } from './pages/Calendar';
+import { PublicQuote } from './pages/PublicQuote';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -31,6 +32,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/p/:quoteId" element={<PublicQuote />} />
       <Route
         path="/dashboard"
         element={
