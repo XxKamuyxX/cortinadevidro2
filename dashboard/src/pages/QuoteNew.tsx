@@ -14,11 +14,12 @@ interface Service {
   id: string;
   name: string;
   description: string;
-  type: 'fixed' | 'unit' | 'meter';
+  type: 'unit' | 'meter' | 'package';
   defaultPrice?: number;
 }
 
-const SERVICES: Service[] = [
+// Serviços padrão - serão carregados do Firestore se disponível
+const DEFAULT_SERVICES: Service[] = [
   {
     id: 'troca-roldanas',
     name: 'Troca de Roldanas',
@@ -27,18 +28,32 @@ const SERVICES: Service[] = [
     defaultPrice: 50,
   },
   {
-    id: 'vedacao-completa',
-    name: 'Vedação Completa',
-    description: 'Substituição completa da vedação',
+    id: 'vedacao',
+    name: 'Vedação',
+    description: 'Substituição da vedação',
     type: 'unit',
     defaultPrice: 35,
   },
   {
-    id: 'higienizacao-blindagem',
-    name: 'Higienização e Blindagem',
-    description: 'Limpeza profunda e blindagem nos trilhos',
+    id: 'higienizacao',
+    name: 'Higienização',
+    description: 'Limpeza profunda e higienização completa',
     type: 'unit',
-    defaultPrice: 450,
+    defaultPrice: 200,
+  },
+  {
+    id: 'limpeza',
+    name: 'Limpeza',
+    description: 'Limpeza profissional dos vidros e trilhos',
+    type: 'unit',
+    defaultPrice: 150,
+  },
+  {
+    id: 'blindagem',
+    name: 'Blindagem',
+    description: 'Blindagem nos trilhos para proteção',
+    type: 'unit',
+    defaultPrice: 100,
   },
   {
     id: 'colagem-vidro',
@@ -87,6 +102,7 @@ export function QuoteNew() {
   const [customServiceName, setCustomServiceName] = useState('');
   const [customServicePrice, setCustomServicePrice] = useState(0);
   const [showCustomService, setShowCustomService] = useState(false);
+  const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
   const [diagnosis, setDiagnosis] = useState({
     beforePhotos: [] as string[],
     afterPhotos: [] as string[],
@@ -95,12 +111,16 @@ export function QuoteNew() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadClients();
-    if (id) {
-      loadQuote(id);
-    } else {
-      setLoading(false);
-    }
+    const init = async () => {
+      await loadClients();
+      await loadServices();
+      if (id) {
+        await loadQuote(id);
+      } else {
+        setLoading(false);
+      }
+    };
+    init();
   }, [id]);
 
   const loadClients = async () => {
@@ -113,6 +133,18 @@ export function QuoteNew() {
       setClients(clientsData);
     } catch (error) {
       console.error('Error loading clients:', error);
+    }
+  };
+
+  const loadServices = async () => {
+    try {
+      const settingsDoc = await getDoc(doc(db, 'settings', 'config'));
+      if (settingsDoc.exists() && settingsDoc.data().services) {
+        setServices(settingsDoc.data().services as Service[]);
+      }
+    } catch (error) {
+      console.error('Error loading services:', error);
+      // Usa serviços padrão se não conseguir carregar
     }
   };
 
@@ -200,20 +232,51 @@ export function QuoteNew() {
     if (!selectedClient) return;
 
     try {
-      const quoteData = {
+      // Sanitize items - remove undefined values
+      const sanitizedItems = items.map((item) => ({
+        serviceId: item.serviceId,
+        serviceName: item.serviceName,
+        quantity: item.quantity || 0,
+        unitPrice: item.unitPrice || 0,
+        total: item.total || 0,
+        isCustom: item.isCustom || false,
+      }));
+
+      // Sanitize diagnosis - only include if has content
+      const sanitizedDiagnosis = 
+        diagnosis.beforePhotos.length > 0 || 
+        diagnosis.afterPhotos.length > 0 || 
+        diagnosis.notes
+          ? {
+              beforePhotos: diagnosis.beforePhotos || [],
+              afterPhotos: diagnosis.afterPhotos || [],
+              notes: diagnosis.notes || '',
+            }
+          : null;
+
+      // Build quoteData - never use undefined
+      const quoteData: any = {
         clientId: selectedClientId,
         clientName: selectedClient.name,
-        items,
-        subtotal,
-        discount,
-        total,
-        status,
-        warranty: warranty || undefined,
-        observations: observations || undefined,
-        diagnosis: diagnosis.beforePhotos.length > 0 || diagnosis.afterPhotos.length > 0 || diagnosis.notes ? diagnosis : undefined,
-        createdAt: id ? undefined : new Date(),
+        items: sanitizedItems,
+        subtotal: subtotal || 0,
+        discount: discount || 0,
+        total: total || 0,
+        status: status || 'draft',
+        warranty: warranty || '',
+        observations: observations || '',
         updatedAt: new Date(),
       };
+
+      // Only add diagnosis if it exists
+      if (sanitizedDiagnosis) {
+        quoteData.diagnosis = sanitizedDiagnosis;
+      }
+
+      // Only add createdAt for new quotes
+      if (!id) {
+        quoteData.createdAt = new Date();
+      }
 
       if (id) {
         await updateDoc(doc(db, 'quotes', id), quoteData);
@@ -381,7 +444,7 @@ export function QuoteNew() {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {SERVICES.map((service) => (
+                  {services.map((service) => (
                     <button
                       key={service.id}
                       onClick={() => addService(service)}
@@ -390,7 +453,8 @@ export function QuoteNew() {
                       <div className="font-medium text-navy">{service.name}</div>
                       <div className="text-xs text-slate-600">{service.description}</div>
                       <div className="text-xs text-gold font-medium mt-1">
-                        R$ {service.defaultPrice?.toFixed(2)}/un
+                        R$ {service.defaultPrice?.toFixed(2)}
+                        {service.type === 'meter' ? '/m' : service.type === 'package' ? '/pacote' : '/un'}
                       </div>
                     </button>
                   ))}
@@ -405,7 +469,7 @@ export function QuoteNew() {
               ) : (
                 <div className="space-y-4">
                   {items.map((item, index) => {
-                    const service = SERVICES.find((s) => s.id === item.serviceId);
+                    const service = services.find((s) => s.id === item.serviceId);
 
                     return (
                       <div

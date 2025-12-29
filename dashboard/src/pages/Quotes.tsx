@@ -1,11 +1,11 @@
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Plus, FileText } from 'lucide-react';
+import { Plus, FileText, ClipboardList } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface Quote {
   id: string;
@@ -32,6 +32,7 @@ const statusColors = {
 export function Quotes() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadQuotes();
@@ -57,6 +58,42 @@ export function Quotes() {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
+  };
+
+  const convertToWorkOrder = async (quote: Quote) => {
+    if (quote.status !== 'approved') {
+      alert('Apenas orçamentos aprovados podem ser convertidos em Ordem de Serviço');
+      return;
+    }
+
+    if (!confirm('Deseja converter este orçamento em Ordem de Serviço?')) {
+      return;
+    }
+
+    try {
+      const workOrderData = {
+        quoteId: quote.id,
+        clientName: quote.clientName,
+        scheduledDate: new Date().toISOString(),
+        technician: '',
+        status: 'scheduled',
+        checklist: [
+          { task: 'Trilhos limpos', completed: false },
+          { task: 'Vidros alinhados', completed: false },
+          { task: 'Vedação testada', completed: false },
+          { task: 'Roldanas verificadas', completed: false },
+        ],
+        notes: '',
+        createdAt: new Date(),
+      };
+
+      await addDoc(collection(db, 'workOrders'), workOrderData);
+      alert('Ordem de Serviço criada com sucesso!');
+      navigate('/work-orders');
+    } catch (error) {
+      console.error('Error creating work order:', error);
+      alert('Erro ao criar Ordem de Serviço');
+    }
   };
 
   return (
@@ -108,6 +145,17 @@ export function Quotes() {
                         Ver
                       </Button>
                     </Link>
+                    {quote.status === 'approved' && (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => convertToWorkOrder(quote)}
+                        className="flex items-center gap-1"
+                      >
+                        <ClipboardList className="w-4 h-4" />
+                        Criar OS
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>

@@ -8,6 +8,14 @@ interface QuoteItem {
   total: number;
 }
 
+interface PDFConfig {
+  companyName: string;
+  address: string;
+  city: string;
+  phone: string;
+  email: string;
+}
+
 interface QuotePDFProps {
   clientName: string;
   clientAddress: string;
@@ -22,6 +30,7 @@ interface QuotePDFProps {
   createdAt?: Date;
   warranty?: string;
   observations?: string;
+  pdfConfig?: PDFConfig;
 }
 
 const styles = StyleSheet.create({
@@ -184,7 +193,15 @@ export function QuotePDF({
   createdAt,
   warranty,
   observations,
+  pdfConfig,
 }: QuotePDFProps) {
+  const config = pdfConfig || {
+    companyName: 'House Manutenção',
+    address: 'Rua Rio Grande do Norte, 726, Savassi',
+    city: 'Belo Horizonte - MG',
+    phone: '(31) 98279-8513',
+    email: 'contato@housemanutencao.com.br',
+  };
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -211,13 +228,13 @@ export function QuotePDF({
               src="/logo.png"
               style={{ width: 80, height: 80, marginBottom: 10 }}
             />
-            <Text style={styles.companyName}>House Manutenção</Text>
+            <Text style={styles.companyName}>{config.companyName}</Text>
           </View>
           <Text style={styles.companyInfo}>
-            Rua Rio Grande do Norte, 726, Savassi{'\n'}
-            Belo Horizonte - MG{'\n'}
-            Telefone: (31) 98279-8513{'\n'}
-            Email: contato@housemanutencao.com.br
+            {config.address}{'\n'}
+            {config.city}{'\n'}
+            Telefone: {config.phone}{'\n'}
+            Email: {config.email}
           </Text>
         </View>
 

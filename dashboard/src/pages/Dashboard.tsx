@@ -2,25 +2,95 @@ import { Link } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { FileText, Users, ClipboardList, Plus } from 'lucide-react';
+import { FileText, Users, ClipboardList, Plus, DollarSign, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 export function Dashboard() {
   const [stats, setStats] = useState({
     openQuotes: 0,
     monthlyRevenue: 0,
     activeWorkOrders: 0,
+    averageTicket: 0,
+    conversionRate: 0,
   });
 
   useEffect(() => {
-    // TODO: Fetch real stats from Firestore
-    // This is a placeholder
-    setStats({
-      openQuotes: 5,
-      monthlyRevenue: 12500,
-      activeWorkOrders: 3,
-    });
+    loadDashboardStats();
   }, []);
+
+  const loadDashboardStats = async () => {
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+      // Load quotes
+      const quotesSnapshot = await getDocs(collection(db, 'quotes'));
+      const quotes = quotesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Array<{ id: string; status?: string; total?: number }>;
+
+      const openQuotes = quotes.filter((q) => q.status === 'draft' || q.status === 'sent').length;
+      const approvedQuotes = quotes.filter((q) => q.status === 'approved').length;
+      const totalQuotes = quotes.length;
+      const conversionRate = totalQuotes > 0 ? (approvedQuotes / totalQuotes) * 100 : 0;
+
+      // Load completed work orders for current month
+      const workOrdersSnapshot = await getDocs(collection(db, 'workOrders'));
+      const workOrders = workOrdersSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Array<{ 
+        id: string; 
+        status?: string; 
+        quoteId?: string; 
+        total?: number; 
+        completedDate?: any; 
+        createdAt?: any 
+      }>;
+
+      const activeWorkOrders = workOrders.filter(
+        (wo) => wo.status === 'scheduled' || wo.status === 'in-progress'
+      ).length;
+
+      // Get completed OS from current month
+      const completedThisMonth = workOrders.filter((wo) => {
+        if (wo.status !== 'completed') return false;
+        const completedDate = wo.completedDate ? new Date(wo.completedDate) : wo.createdAt?.toDate();
+        if (!completedDate) return false;
+        return completedDate >= startOfMonth && completedDate <= endOfMonth;
+      });
+
+      // Calculate monthly revenue from completed OS
+      // Try to get total from quoteId if available
+      let monthlyRevenue = 0;
+      for (const os of completedThisMonth) {
+        if (os.quoteId) {
+          const quote = quotes.find((q) => q.id === os.quoteId);
+          if (quote && quote.total) {
+            monthlyRevenue += quote.total || 0;
+          }
+        } else if (os.total) {
+          monthlyRevenue += os.total;
+        }
+      }
+
+      const averageTicket = completedThisMonth.length > 0 ? monthlyRevenue / completedThisMonth.length : 0;
+
+      setStats({
+        openQuotes,
+        monthlyRevenue,
+        activeWorkOrders,
+        averageTicket,
+        conversionRate,
+      });
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -47,7 +117,7 @@ export function Dashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <Card>
             <div className="flex items-center justify-between">
               <div>
@@ -63,11 +133,35 @@ export function Dashboard() {
           <Card>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600 mb-1">Faturamento do Mês</p>
+                <p className="text-sm text-slate-600 mb-1">Total Faturado (Mês)</p>
                 <p className="text-3xl font-bold text-navy">{formatCurrency(stats.monthlyRevenue)}</p>
               </div>
               <div className="bg-gold-100 rounded-full p-3">
-                <ClipboardList className="w-8 h-8 text-gold-600" />
+                <DollarSign className="w-8 h-8 text-gold-600" />
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Ticket Médio</p>
+                <p className="text-3xl font-bold text-navy">{formatCurrency(stats.averageTicket)}</p>
+              </div>
+              <div className="bg-purple-100 rounded-full p-3">
+                <TrendingUp className="w-8 h-8 text-purple-600" />
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600 mb-1">Taxa de Conversão</p>
+                <p className="text-3xl font-bold text-navy">{stats.conversionRate.toFixed(1)}%</p>
+              </div>
+              <div className="bg-green-100 rounded-full p-3">
+                <TrendingUp className="w-8 h-8 text-green-600" />
               </div>
             </div>
           </Card>
@@ -78,8 +172,8 @@ export function Dashboard() {
                 <p className="text-sm text-slate-600 mb-1">OS em Andamento</p>
                 <p className="text-3xl font-bold text-navy">{stats.activeWorkOrders}</p>
               </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <Users className="w-8 h-8 text-green-600" />
+              <div className="bg-orange-100 rounded-full p-3">
+                <ClipboardList className="w-8 h-8 text-orange-600" />
               </div>
             </div>
           </Card>
@@ -119,4 +213,3 @@ export function Dashboard() {
     </Layout>
   );
 }
-

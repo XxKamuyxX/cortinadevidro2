@@ -1,11 +1,13 @@
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, Circle, Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
+import { pdf } from '@react-pdf/renderer';
+import { ReceiptPDF } from '../components/ReceiptPDF';
 
 interface WorkOrder {
   id: string;
@@ -53,6 +55,47 @@ export function WorkOrders() {
     completed: 'bg-green-100 text-green-700',
   };
 
+  const handleGenerateReceipt = async (order: WorkOrder) => {
+    try {
+      // Buscar dados do orçamento relacionado
+      let quoteData = null;
+      if (order.quoteId) {
+        const quoteDoc = await getDoc(doc(db, 'quotes', order.quoteId));
+        if (quoteDoc.exists()) {
+          quoteData = quoteDoc.data();
+        }
+      }
+
+      const receiptDoc = (
+        <ReceiptPDF
+          clientName={order.clientName}
+          workOrderId={order.id}
+          scheduledDate={order.scheduledDate}
+          completedDate={new Date().toISOString()}
+          technician={order.technician}
+          checklist={order.checklist}
+          notes={order.notes}
+          items={quoteData?.items || []}
+          total={quoteData?.total || 0}
+          warranty={quoteData?.warranty || '90 dias'}
+        />
+      );
+
+      const blob = await pdf(receiptDoc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Recibo_${order.clientName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      alert('Erro ao gerar recibo');
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -89,9 +132,21 @@ export function WorkOrders() {
                         <p>Técnico: {order.technician}</p>
                       </div>
                     </div>
-                    <Link to={`/work-orders/${order.id}`}>
-                      <Button variant="outline">Ver Detalhes</Button>
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link to={`/work-orders/${order.id}`}>
+                        <Button variant="outline">Ver Detalhes</Button>
+                      </Link>
+                      {order.status === 'completed' && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => handleGenerateReceipt(order)}
+                          className="flex items-center gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Gerar Recibo
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Checklist Preview */}

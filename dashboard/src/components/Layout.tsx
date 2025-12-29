@@ -9,7 +9,10 @@ import {
   ClipboardList, 
   LogOut,
   Menu,
-  X
+  X,
+  DollarSign,
+  Settings as SettingsIcon,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -33,6 +36,9 @@ export function Layout({ children }: LayoutProps) {
     { path: '/clients', icon: Users, label: 'Clientes' },
     { path: '/quotes', icon: FileText, label: 'Orçamentos' },
     { path: '/work-orders', icon: ClipboardList, label: 'Ordens de Serviço' },
+    { path: '/calendar', icon: CalendarIcon, label: 'Agenda' },
+    { path: '/finance', icon: DollarSign, label: 'Financeiro' },
+    { path: '/settings', icon: SettingsIcon, label: 'Configurações' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
