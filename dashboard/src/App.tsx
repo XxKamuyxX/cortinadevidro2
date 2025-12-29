@@ -10,6 +10,8 @@ import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
 import { Calendar } from './pages/Calendar';
 import { PublicQuote } from './pages/PublicQuote';
+import { WorkOrderDetails } from './pages/WorkOrderDetails';
+import { Feedback } from './pages/Feedback';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -33,6 +35,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/p/:quoteId" element={<PublicQuote />} />
+      <Route path="/feedback/:osId" element={<Feedback />} />
       <Route
         path="/dashboard"
         element={
@@ -78,6 +81,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <WorkOrders />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/work-orders/:id"
+        element={
+          <PrivateRoute>
+            <WorkOrderDetails />
           </PrivateRoute>
         }
       />
