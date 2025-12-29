@@ -11,6 +11,7 @@ import { Settings } from './pages/Settings';
 import { Calendar } from './pages/Calendar';
 import { PublicQuote } from './pages/PublicQuote';
 import { PublicWorkOrder } from './pages/PublicWorkOrder';
+import { PublicWorkOrderApprove } from './pages/PublicWorkOrderApprove';
 import { PublicReceipt } from './pages/PublicReceipt';
 import { WorkOrderDetails } from './pages/WorkOrderDetails';
 import { Feedback } from './pages/Feedback';
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/p/quote/:quoteId" element={<PublicQuote />} />
       <Route path="/p/:quoteId" element={<PublicQuote />} />
       <Route path="/p/os/:osId" element={<PublicWorkOrder />} />
+      <Route path="/p/os/:osId/approve" element={<PublicWorkOrderApprove />} />
       <Route path="/p/receipt/:receiptId" element={<PublicReceipt />} />
       <Route path="/feedback/:osId" element={<Feedback />} />
       <Route

@@ -20,24 +20,48 @@ interface TechnicalInspectionProps {
   }) => void;
 }
 
-const DEFECT_OPTIONS = ['Roldana', 'Vedação', 'Vidro Lascado', 'Fechadura', 'Trilho'];
+const DEFECT_OPTIONS = [
+  'Roldana', 
+  'Vedação', 
+  'Vidro Lascado', 
+  'Fechadura', 
+  'Trilho',
+  'Vidro Solto',
+  'Tombando',
+  'Descolado'
+];
 
-const GENERAL_CHECKLIST_ITEMS = [
-  'Proteção do piso realizada',
-  'Condição das paredes verificada',
-  'Área de trabalho limpa',
-  'Ferramentas organizadas',
+interface GeneralChecklistItem {
+  task: string;
+  completed: boolean;
+  value?: string; // Para campos com opções (guia, trilhos, níveis)
+}
+
+const GENERAL_CHECKLIST_ITEMS: GeneralChecklistItem[] = [
+  { task: 'Proteção do piso realizada', completed: false },
+  { task: 'Condição das paredes verificada', completed: false },
+  { task: 'Área de trabalho limpa', completed: false },
+  { task: 'Ferramentas organizadas', completed: false },
+];
+
+const LEVEL_OPTIONS = [
+  { value: '', label: 'Selecione' },
+  { value: 'leve', label: 'Leve' },
+  { value: 'moderado', label: 'Moderado' },
+  { value: 'intenso', label: 'Intenso' },
 ];
 
 export function TechnicalInspection({
   initialLeaves = [],
-  initialGeneralChecklist = GENERAL_CHECKLIST_ITEMS.map((task) => ({ task, completed: false })),
+  initialGeneralChecklist = GENERAL_CHECKLIST_ITEMS.map(item => ({ ...item })),
   onSave,
 }: TechnicalInspectionProps) {
   const [numberOfLeaves, setNumberOfLeaves] = useState(initialLeaves.length || 0);
   const [leaves, setLeaves] = useState<Leaf[]>(initialLeaves);
   const [selectedLeaf, setSelectedLeaf] = useState<number | null>(null);
-  const [generalChecklist, setGeneralChecklist] = useState(initialGeneralChecklist);
+  const [generalChecklist, setGeneralChecklist] = useState<GeneralChecklistItem[]>(
+    initialGeneralChecklist.length > 0 ? initialGeneralChecklist : GENERAL_CHECKLIST_ITEMS.map(item => ({ ...item }))
+  );
 
   const handleSetLeaves = () => {
     if (numberOfLeaves <= 0) {
@@ -82,6 +106,12 @@ export function TechnicalInspection({
   const toggleGeneralChecklist = (index: number) => {
     const updated = [...generalChecklist];
     updated[index].completed = !updated[index].completed;
+    setGeneralChecklist(updated);
+  };
+
+  const updateGeneralChecklistValue = (index: number, value: string) => {
+    const updated = [...generalChecklist];
+    updated[index].value = value;
     setGeneralChecklist(updated);
   };
 
@@ -280,24 +310,132 @@ export function TechnicalInspection({
 
       {/* General Checklist */}
       <Card>
-        <h2 className="text-xl font-bold text-navy mb-4">Checklist Geral (Ambiente)</h2>
-        <div className="space-y-2">
+        <h2 className="text-xl font-bold text-navy mb-4">Checklist Geral</h2>
+        <div className="space-y-4">
+          {/* Checklist Simples */}
           {generalChecklist.map((item, index) => (
-            <button
+            <div
               key={index}
-              onClick={() => toggleGeneralChecklist(index)}
-              className="w-full flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors text-left"
+              className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              {item.completed ? (
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-              ) : (
-                <div className="w-5 h-5 border-2 border-slate-300 rounded-full" />
-              )}
-              <span className={item.completed ? 'text-slate-600 line-through' : 'text-slate-700'}>
-                {item.task}
-              </span>
-            </button>
+              <button
+                onClick={() => toggleGeneralChecklist(index)}
+                className="flex items-center gap-3 flex-1 text-left"
+              >
+                {item.completed ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <div className="w-5 h-5 border-2 border-slate-300 rounded-full" />
+                )}
+                <span className={item.completed ? 'text-slate-600 line-through' : 'text-slate-700'}>
+                  {item.task}
+                </span>
+              </button>
+            </div>
           ))}
+
+          {/* Guia */}
+          <div className="p-4 border-2 border-navy rounded-lg bg-navy-50">
+            <label className="block text-sm font-medium text-navy mb-2">Guia</label>
+            <select
+              value={generalChecklist.find(item => item.task === 'Guia')?.value || ''}
+              onChange={(e) => {
+                const guiaIndex = generalChecklist.findIndex(item => item.task === 'Guia');
+                if (guiaIndex === -1) {
+                  setGeneralChecklist([...generalChecklist, { task: 'Guia', completed: true, value: e.target.value }]);
+                } else {
+                  updateGeneralChecklistValue(guiaIndex, e.target.value);
+                  if (e.target.value) {
+                    const updated = [...generalChecklist];
+                    updated[guiaIndex].completed = true;
+                    setGeneralChecklist(updated);
+                  }
+                }
+              }}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy bg-white"
+            >
+              <option value="">Selecione</option>
+              <option value="com-guia">Com Guia</option>
+              <option value="sem-guia">Sem Guia</option>
+            </select>
+          </div>
+
+          {/* Trilhos */}
+          <div className="p-4 border-2 border-navy rounded-lg bg-navy-50 space-y-3">
+            <label className="block text-sm font-medium text-navy mb-2">Trilhos</label>
+            
+            {/* Amassado */}
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Amassado</label>
+              <select
+                value={generalChecklist.find(item => item.task === 'Trilhos - Amassado')?.value || ''}
+                onChange={(e) => {
+                  const index = generalChecklist.findIndex(item => item.task === 'Trilhos - Amassado');
+                  if (index === -1) {
+                    setGeneralChecklist([...generalChecklist, { task: 'Trilhos - Amassado', completed: !!e.target.value, value: e.target.value }]);
+                  } else {
+                    updateGeneralChecklistValue(index, e.target.value);
+                    const updated = [...generalChecklist];
+                    updated[index].completed = !!e.target.value;
+                    setGeneralChecklist(updated);
+                  }
+                }}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy bg-white"
+              >
+                {LEVEL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Ressecado */}
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Ressecado</label>
+              <select
+                value={generalChecklist.find(item => item.task === 'Trilhos - Ressecado')?.value || ''}
+                onChange={(e) => {
+                  const index = generalChecklist.findIndex(item => item.task === 'Trilhos - Ressecado');
+                  if (index === -1) {
+                    setGeneralChecklist([...generalChecklist, { task: 'Trilhos - Ressecado', completed: !!e.target.value, value: e.target.value }]);
+                  } else {
+                    updateGeneralChecklistValue(index, e.target.value);
+                    const updated = [...generalChecklist];
+                    updated[index].completed = !!e.target.value;
+                    setGeneralChecklist(updated);
+                  }
+                }}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy bg-white"
+              >
+                {LEVEL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sujo */}
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Sujo</label>
+              <select
+                value={generalChecklist.find(item => item.task === 'Trilhos - Sujo')?.value || ''}
+                onChange={(e) => {
+                  const index = generalChecklist.findIndex(item => item.task === 'Trilhos - Sujo');
+                  if (index === -1) {
+                    setGeneralChecklist([...generalChecklist, { task: 'Trilhos - Sujo', completed: !!e.target.value, value: e.target.value }]);
+                  } else {
+                    updateGeneralChecklistValue(index, e.target.value);
+                    const updated = [...generalChecklist];
+                    updated[index].completed = !!e.target.value;
+                    setGeneralChecklist(updated);
+                  }
+                }}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy bg-white"
+              >
+                {LEVEL_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </Card>
 

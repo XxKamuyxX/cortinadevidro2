@@ -3,9 +3,9 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { CheckCircle2, Circle, X, Plus, Copy, ExternalLink, FileText, ClipboardCheck } from 'lucide-react';
+import { CheckCircle2, Circle, X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Send } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
 import { TechnicalInspection } from '../components/TechnicalInspection';
 import { WhatsAppButton } from '../components/WhatsAppButton';
@@ -176,6 +176,55 @@ export function WorkOrderDetails() {
     } catch (error) {
       console.error('Error generating receipt:', error);
       alert('Erro ao gerar recibo');
+    }
+  };
+
+  const handleSendApprovalLink = () => {
+    if (!id || !workOrder) return;
+    
+    const approvalLink = `${window.location.origin}/p/os/${id}/approve`;
+    
+    if (!clientPhone || clientPhone.trim() === '') {
+      // Se não tem telefone, copia o link
+      navigator.clipboard.writeText(approvalLink);
+      alert('Link copiado para a área de transferência! Cole no WhatsApp manualmente.');
+      return;
+    }
+
+    const sanitizePhone = (phone: string): string => {
+      if (!phone) return '';
+      let cleaned = phone.replace(/[\s\(\)\-]/g, '');
+      if (cleaned.startsWith('+')) {
+        cleaned = cleaned.substring(1);
+      }
+      if (!cleaned.startsWith('55')) {
+        cleaned = '55' + cleaned;
+      }
+      return cleaned;
+    };
+
+    const phone = sanitizePhone(clientPhone);
+    const message = `Olá ${workOrder.clientName}, por favor, acesse o link abaixo para aprovar a ordem de serviço: ${approvalLink}`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
+    
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const handleDeleteWorkOrder = async () => {
+    if (!id || !workOrder) return;
+
+    if (!confirm(`Tem certeza que deseja excluir a ordem de serviço de ${workOrder.clientName}? Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'workOrders', id));
+      alert('Ordem de serviço excluída com sucesso!');
+      navigate('/work-orders');
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      alert('Erro ao excluir ordem de serviço');
     }
   };
 
@@ -532,6 +581,28 @@ export function WorkOrderDetails() {
         {/* Tab Content */}
         {activeTab === 'info' && (
           <>
+            {/* Send Approval Link */}
+            {(workOrder.status === 'in-progress' || workOrder.status === 'scheduled') && (
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-navy mb-2">Enviar Link de Aprovação</h2>
+                    <p className="text-sm text-slate-600">
+                      Envie o link para o cliente aprovar a ordem de serviço via WhatsApp
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    onClick={handleSendApprovalLink}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <Send className="w-5 h-5" />
+                    Enviar para Aprovação
+                  </Button>
+                </div>
+              </Card>
+            )}
+
             {/* WhatsApp Button */}
             {workOrder.status === 'completed' && (
               <Card>
@@ -566,6 +637,26 @@ export function WorkOrderDetails() {
                 </Button>
               </Card>
             )}
+
+            {/* Delete Work Order */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-red-600 mb-2">Zona de Perigo</h2>
+                  <p className="text-sm text-slate-600">
+                    Excluir permanentemente esta ordem de serviço
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleDeleteWorkOrder}
+                  className="flex items-center gap-2 border-red-600 text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Excluir OS
+                </Button>
+              </div>
+            </Card>
           </>
         )}
 
