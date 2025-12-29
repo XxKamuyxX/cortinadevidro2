@@ -71,6 +71,7 @@ interface QuoteItem {
   quantity: number;
   unitPrice: number;
   total: number;
+  isCustom?: boolean;
 }
 
 export function QuoteNew() {
@@ -81,6 +82,16 @@ export function QuoteNew() {
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [discount, setDiscount] = useState(0);
   const [status, setStatus] = useState<'draft' | 'sent' | 'approved' | 'cancelled'>('draft');
+  const [warranty, setWarranty] = useState('');
+  const [observations, setObservations] = useState('');
+  const [customServiceName, setCustomServiceName] = useState('');
+  const [customServicePrice, setCustomServicePrice] = useState(0);
+  const [showCustomService, setShowCustomService] = useState(false);
+  const [diagnosis, setDiagnosis] = useState({
+    beforePhotos: [] as string[],
+    afterPhotos: [] as string[],
+    notes: '',
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -115,6 +126,9 @@ export function QuoteNew() {
         setItems(data.items || []);
         setDiscount(data.discount || 0);
         setStatus(data.status || 'draft');
+        setWarranty(data.warranty || '');
+        setObservations(data.observations || '');
+        setDiagnosis(data.diagnosis || { beforePhotos: [], afterPhotos: [], notes: '' });
       }
     } catch (error) {
       console.error('Error loading quote:', error);
@@ -130,8 +144,28 @@ export function QuoteNew() {
       quantity: 1,
       unitPrice: service.defaultPrice || 0,
       total: service.defaultPrice || 0,
+      isCustom: false,
     };
     setItems([...items, newItem]);
+  };
+
+  const addCustomService = () => {
+    if (!customServiceName || customServicePrice <= 0) {
+      alert('Preencha o nome e o preço do serviço');
+      return;
+    }
+    const newItem: QuoteItem = {
+      serviceId: `custom-${Date.now()}`,
+      serviceName: customServiceName,
+      quantity: 1,
+      unitPrice: customServicePrice,
+      total: customServicePrice,
+      isCustom: true,
+    };
+    setItems([...items, newItem]);
+    setCustomServiceName('');
+    setCustomServicePrice(0);
+    setShowCustomService(false);
   };
 
   const updateItem = (index: number, field: 'quantity' | 'unitPrice', value: number) => {
@@ -166,7 +200,7 @@ export function QuoteNew() {
     if (!selectedClient) return;
 
     try {
-      const quoteData: QuoteData = {
+      const quoteData = {
         clientId: selectedClientId,
         clientName: selectedClient.name,
         items,
@@ -176,6 +210,7 @@ export function QuoteNew() {
         status,
         warranty: warranty || undefined,
         observations: observations || undefined,
+        diagnosis: diagnosis.beforePhotos.length > 0 || diagnosis.afterPhotos.length > 0 || diagnosis.notes ? diagnosis : undefined,
         createdAt: id ? undefined : new Date(),
         updatedAt: new Date(),
       };
@@ -216,6 +251,8 @@ export function QuoteNew() {
           total={total}
           quoteNumber={id || undefined}
           createdAt={new Date()}
+          warranty={warranty || undefined}
+          observations={observations || undefined}
         />
       );
 
@@ -303,7 +340,46 @@ export function QuoteNew() {
 
               {/* Add Service */}
               <div className="mb-4 p-4 border-2 border-dashed border-slate-300 rounded-lg">
-                <p className="text-sm text-slate-600 mb-3">Adicionar Serviço:</p>
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-sm font-medium text-slate-700">Adicionar Serviço:</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCustomService(!showCustomService)}
+                  >
+                    {showCustomService ? 'Cancelar' : '+ Serviço Manual'}
+                  </Button>
+                </div>
+
+                {showCustomService && (
+                  <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <h3 className="text-sm font-medium text-navy mb-3">Adicionar Serviço Manual</h3>
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Nome do serviço"
+                        value={customServiceName}
+                        onChange={(e) => setCustomServiceName(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder="Preço unitário"
+                          min="0"
+                          step="0.01"
+                          value={customServicePrice}
+                          onChange={(e) => setCustomServicePrice(parseFloat(e.target.value) || 0)}
+                          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                        />
+                        <Button variant="primary" size="sm" onClick={addCustomService}>
+                          Adicionar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {SERVICES.map((service) => (
                     <button
@@ -314,11 +390,7 @@ export function QuoteNew() {
                       <div className="font-medium text-navy">{service.name}</div>
                       <div className="text-xs text-slate-600">{service.description}</div>
                       <div className="text-xs text-gold font-medium mt-1">
-                        {service.type === 'fixed'
-                          ? `R$ ${service.defaultPrice?.toFixed(2)}`
-                          : service.type === 'meter'
-                          ? `R$ ${service.defaultPrice?.toFixed(2)}/m`
-                          : `R$ ${service.defaultPrice?.toFixed(2)}/un`}
+                        R$ {service.defaultPrice?.toFixed(2)}/un
                       </div>
                     </button>
                   ))}
@@ -334,8 +406,6 @@ export function QuoteNew() {
                 <div className="space-y-4">
                   {items.map((item, index) => {
                     const service = SERVICES.find((s) => s.id === item.serviceId);
-                    const isFixed = service?.type === 'fixed';
-                    const isMeter = service?.type === 'meter';
 
                     return (
                       <div
@@ -453,6 +523,33 @@ export function QuoteNew() {
                   { value: 'cancelled', label: 'Cancelado' },
                 ]}
               />
+            </Card>
+
+            {/* Garantia */}
+            <Card>
+              <h2 className="text-xl font-bold text-navy mb-4">Garantia</h2>
+              <input
+                type="text"
+                placeholder="Ex: 90 dias, 6 meses, etc."
+                value={warranty}
+                onChange={(e) => setWarranty(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+              />
+            </Card>
+
+            {/* Observações */}
+            <Card>
+              <h2 className="text-xl font-bold text-navy mb-4">Observações</h2>
+              <textarea
+                placeholder="Itens que o cliente optou por não trocar, observações técnicas, etc."
+                value={observations}
+                onChange={(e) => setObservations(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy resize-none"
+              />
+              <p className="text-xs text-slate-500 mt-2">
+                Use este campo para documentar itens que precisavam ser trocados mas o cliente optou por não fazer.
+              </p>
             </Card>
           </div>
         </div>

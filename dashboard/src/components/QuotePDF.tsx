@@ -20,6 +20,8 @@ interface QuotePDFProps {
   total: number;
   quoteNumber?: string;
   createdAt?: Date;
+  warranty?: string;
+  observations?: string;
 }
 
 const styles = StyleSheet.create({
@@ -191,8 +193,12 @@ export function QuotePDF({
   };
 
   const formatDate = (date?: Date) => {
-    if (!date) return new Date().toLocaleDateString('pt-BR');
-    return new Date(date).toLocaleDateString('pt-BR');
+    if (!date) {
+      const now = new Date();
+      return `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    const d = new Date(date);
+    return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
   };
 
   return (
@@ -201,6 +207,10 @@ export function QuotePDF({
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
+            <Image
+              src="/logo.png"
+              style={{ width: 80, height: 80, marginBottom: 10 }}
+            />
             <Text style={styles.companyName}>House Manutenção</Text>
           </View>
           <Text style={styles.companyInfo}>
@@ -276,10 +286,25 @@ export function QuotePDF({
           </View>
         </View>
 
+        {/* Warranty */}
+        {warranty && (
+          <View style={styles.validity}>
+            <Text style={{ fontWeight: 'bold' }}>GARANTIA: {warranty.toUpperCase()}</Text>
+          </View>
+        )}
+
         {/* Validity */}
         <View style={styles.validity}>
           <Text style={{ fontWeight: 'bold' }}>VALIDADE: 10 DIAS</Text>
         </View>
+
+        {/* Observations */}
+        {observations && (
+          <View style={styles.footer}>
+            <Text style={styles.footerTitle}>OBSERVAÇÕES:</Text>
+            <Text style={styles.footerText}>{observations}</Text>
+          </View>
+        )}
 
         {/* Payment Terms */}
         <View style={styles.footer}>
