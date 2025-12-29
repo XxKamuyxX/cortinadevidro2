@@ -1,0 +1,121 @@
+import { Layout } from '../components/Layout';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Plus, FileText } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { Link } from 'react-router-dom';
+
+interface Quote {
+  id: string;
+  clientName: string;
+  status: 'draft' | 'sent' | 'approved' | 'cancelled';
+  total: number;
+  createdAt: any;
+}
+
+const statusLabels = {
+  draft: 'Rascunho',
+  sent: 'Enviado',
+  approved: 'Aprovado',
+  cancelled: 'Cancelado',
+};
+
+const statusColors = {
+  draft: 'bg-slate-100 text-slate-700',
+  sent: 'bg-blue-100 text-blue-700',
+  approved: 'bg-green-100 text-green-700',
+  cancelled: 'bg-red-100 text-red-700',
+};
+
+export function Quotes() {
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadQuotes();
+  }, []);
+
+  const loadQuotes = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, 'quotes'));
+      const quotesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Quote[];
+      setQuotes(quotesData);
+    } catch (error) {
+      console.error('Error loading quotes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  };
+
+  return (
+    <Layout>
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-navy">Orçamentos</h1>
+            <p className="text-slate-600 mt-1">Gerencie seus orçamentos</p>
+          </div>
+          <Link to="/quotes/new">
+            <Button variant="primary" size="lg" className="flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Novo Orçamento
+            </Button>
+          </Link>
+        </div>
+
+        {loading ? (
+          <Card>
+            <p className="text-center text-slate-600 py-8">Carregando...</p>
+          </Card>
+        ) : quotes.length === 0 ? (
+          <Card>
+            <p className="text-center text-slate-600 py-8">Nenhum orçamento encontrado</p>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {quotes.map((quote) => (
+              <Card key={quote.id}>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-bold text-navy">{quote.clientName}</h3>
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[quote.status]}`}
+                      >
+                        {statusLabels[quote.status]}
+                      </span>
+                    </div>
+                    <p className="text-slate-600">
+                      Total: <span className="font-bold text-navy">{formatCurrency(quote.total)}</span>
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link to={`/quotes/${quote.id}`}>
+                      <Button variant="outline" size="sm">
+                        <FileText className="w-4 h-4 mr-1" />
+                        Ver
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
+  );
+}
+
