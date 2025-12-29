@@ -4,14 +4,16 @@ import { Button } from './ui/Button';
 import { X } from 'lucide-react';
 
 interface DatePickerModalProps {
-  onConfirm: (date: Date) => void;
+  onConfirm: (date: Date, time?: string) => void;
   onCancel: () => void;
   title?: string;
   message?: string;
+  includeTime?: boolean;
 }
 
-export function DatePickerModal({ onConfirm, onCancel, title = 'Selecionar Data', message }: DatePickerModalProps) {
+export function DatePickerModal({ onConfirm, onCancel, title = 'Selecionar Data e Hora', message, includeTime = true }: DatePickerModalProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedTime, setSelectedTime] = useState('09:00');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +21,11 @@ export function DatePickerModal({ onConfirm, onCancel, title = 'Selecionar Data'
       alert('Selecione uma data');
       return;
     }
-    onConfirm(new Date(selectedDate));
+    if (includeTime && !selectedTime) {
+      alert('Selecione um horário');
+      return;
+    }
+    onConfirm(new Date(selectedDate), includeTime ? selectedTime : undefined);
   };
 
   return (
@@ -49,6 +55,21 @@ export function DatePickerModal({ onConfirm, onCancel, title = 'Selecionar Data'
               required
             />
           </div>
+
+          {includeTime && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Horário Agendado
+              </label>
+              <input
+                type="time"
+                value={selectedTime}
+                onChange={(e) => setSelectedTime(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                required
+              />
+            </div>
+          )}
 
           <div className="flex gap-4 pt-4">
             <Button type="submit" variant="primary" className="flex-1">

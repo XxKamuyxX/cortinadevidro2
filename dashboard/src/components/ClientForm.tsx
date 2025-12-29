@@ -11,6 +11,7 @@ interface Client {
   condominium: string;
   phone: string;
   email: string;
+  origin?: string; // Origem do cliente (Instagram, Facebook, WhatsApp, etc.)
 }
 
 interface ClientFormProps {
@@ -27,6 +28,7 @@ export function ClientForm({ client, onSave, onCancel, vipCondominiums }: Client
     condominium: '',
     phone: '',
     email: '',
+    origin: '',
   });
 
   useEffect(() => {
@@ -37,6 +39,7 @@ export function ClientForm({ client, onSave, onCancel, vipCondominiums }: Client
         condominium: client.condominium,
         phone: client.phone,
         email: client.email,
+        origin: client.origin || '',
       });
     }
   }, [client]);

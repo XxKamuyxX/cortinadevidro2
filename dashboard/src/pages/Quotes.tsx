@@ -135,22 +135,17 @@ export function Quotes() {
     setShowDatePicker(true);
   };
 
-  const handleDateConfirm = async (date: Date) => {
+  const handleDateConfirm = async (date: Date, time?: string) => {
     if (!selectedQuote) return;
 
     try {
-      const workOrderData = {
+      const workOrderData: any = {
         quoteId: selectedQuote.id,
         clientName: selectedQuote.clientName,
         scheduledDate: date.toISOString(),
+        scheduledTime: time || '09:00',
         technician: '',
         status: 'scheduled',
-        checklist: [
-          { task: 'Trilhos limpos', completed: false },
-          { task: 'Vidros alinhados', completed: false },
-          { task: 'Vedação testada', completed: false },
-          { task: 'Roldanas verificadas', completed: false },
-        ],
         notes: '',
         createdAt: new Date(),
       };

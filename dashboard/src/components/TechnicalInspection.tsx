@@ -8,6 +8,7 @@ interface Leaf {
   id: number;
   status: 'perfect' | 'attention' | 'damaged';
   defects: string[];
+  customDefect?: string; // Campo de texto livre para defeitos não listados
   photo?: string;
 }
 
@@ -101,12 +102,6 @@ export function TechnicalInspection({
 
   const handlePhotoUpload = (leafId: number, url: string) => {
     setLeaves(leaves.map((leaf) => (leaf.id === leafId ? { ...leaf, photo: url } : leaf)));
-  };
-
-  const toggleGeneralChecklist = (index: number) => {
-    const updated = [...generalChecklist];
-    updated[index].completed = !updated[index].completed;
-    setGeneralChecklist(updated);
   };
 
   const updateGeneralChecklistValue = (index: number, value: string) => {
@@ -265,7 +260,7 @@ export function TechnicalInspection({
                     <label className="block text-sm font-medium text-slate-700 mb-2">
                       Defeitos (Selecione múltiplos)
                     </label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 mb-3">
                       {DEFECT_OPTIONS.map((defect) => {
                         const leaf = leaves.find((l) => l.id === selectedLeaf);
                         const isSelected = leaf?.defects.includes(defect);
@@ -283,6 +278,25 @@ export function TechnicalInspection({
                           </button>
                         );
                       })}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">
+                        Outro defeito (descreva)
+                      </label>
+                      <input
+                        type="text"
+                        value={leaves.find((l) => l.id === selectedLeaf)?.customDefect || ''}
+                        onChange={(e) => {
+                          const updatedLeaves = leaves.map((leaf) =>
+                            leaf.id === selectedLeaf
+                              ? { ...leaf, customDefect: e.target.value }
+                              : leaf
+                          );
+                          setLeaves(updatedLeaves);
+                        }}
+                        placeholder="Descreva outro defeito não listado..."
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      />
                     </div>
                   </div>
 
@@ -308,56 +322,33 @@ export function TechnicalInspection({
         </Card>
       )}
 
-      {/* General Checklist */}
+      {/* General Checklist - Apenas Guia e Trilhos */}
       <Card>
         <h2 className="text-xl font-bold text-navy mb-4">Checklist Geral</h2>
         <div className="space-y-4">
-          {/* Checklist Simples */}
-          {generalChecklist.map((item, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-            >
-              <button
-                onClick={() => toggleGeneralChecklist(index)}
-                className="flex items-center gap-3 flex-1 text-left"
-              >
-                {item.completed ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                ) : (
-                  <div className="w-5 h-5 border-2 border-slate-300 rounded-full" />
-                )}
-                <span className={item.completed ? 'text-slate-600 line-through' : 'text-slate-700'}>
-                  {item.task}
-                </span>
-              </button>
-            </div>
-          ))}
-
-          {/* Guia */}
+          {/* Guia - Quantidade */}
           <div className="p-4 border-2 border-navy rounded-lg bg-navy-50">
-            <label className="block text-sm font-medium text-navy mb-2">Guia</label>
-            <select
-              value={generalChecklist.find(item => item.task === 'Guia')?.value || ''}
+            <label className="block text-sm font-medium text-navy mb-2">Quantidade de Guias</label>
+            <input
+              type="number"
+              min="0"
+              value={generalChecklist.find(item => item.task === 'Guia')?.value || '0'}
               onChange={(e) => {
                 const guiaIndex = generalChecklist.findIndex(item => item.task === 'Guia');
+                const value = e.target.value;
                 if (guiaIndex === -1) {
-                  setGeneralChecklist([...generalChecklist, { task: 'Guia', completed: true, value: e.target.value }]);
+                  setGeneralChecklist([...generalChecklist, { task: 'Guia', completed: true, value }]);
                 } else {
-                  updateGeneralChecklistValue(guiaIndex, e.target.value);
-                  if (e.target.value) {
-                    const updated = [...generalChecklist];
-                    updated[guiaIndex].completed = true;
-                    setGeneralChecklist(updated);
-                  }
+                  updateGeneralChecklistValue(guiaIndex, value);
+                  const updated = [...generalChecklist];
+                  updated[guiaIndex].completed = true;
+                  setGeneralChecklist(updated);
                 }
               }}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy bg-white"
-            >
-              <option value="">Selecione</option>
-              <option value="com-guia">Com Guia</option>
-              <option value="sem-guia">Sem Guia</option>
-            </select>
+              placeholder="0"
+            />
+            <p className="text-xs text-slate-600 mt-1">Digite 0 se não houver guias</p>
           </div>
 
           {/* Trilhos */}

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Clients } from './pages/Clients';
+import { ClientNew } from './pages/ClientNew';
 import { Quotes } from './pages/Quotes';
 import { QuoteNew } from './pages/QuoteNew';
 import { WorkOrders } from './pages/WorkOrders';
@@ -56,6 +57,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Clients />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/clients/new"
+        element={
+          <PrivateRoute>
+            <ClientNew />
           </PrivateRoute>
         }
       />

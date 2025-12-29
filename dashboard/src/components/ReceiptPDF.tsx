@@ -254,7 +254,7 @@ export function ReceiptPDF({
   warranty,
   photos = [],
   hasRisk = false,
-  cnpj = '00.000.000/0001-00',
+  cnpj = '42.721.809/0001-52',
 }: ReceiptPDFProps) {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -277,12 +277,12 @@ export function ReceiptPDF({
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoContainer}>
+          <View style={[styles.logoContainer, { alignItems: 'center' }]}>
             <Image
               src="/logo.png"
               style={{ width: 80, height: 80, marginBottom: 10 }}
             />
-            <Text style={styles.companyName}>House Manutenção</Text>
+            <Text style={[styles.companyName, { textAlign: 'center' }]}>House Manutenção</Text>
           </View>
           <Text style={styles.companyInfo}>
             Rua Rio Grande do Norte, 726, Savassi{'\n'}

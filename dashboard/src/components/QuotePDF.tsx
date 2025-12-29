@@ -260,7 +260,7 @@ export function QuotePDF({
   pdfConfig,
   photos = [],
   hasRisk = false,
-  cnpj = '00.000.000/0001-00',
+  cnpj = '42.721.809/0001-52',
 }: QuotePDFProps) {
   // photos, hasRisk, and cnpj are used in the JSX below
   const config = pdfConfig || {
