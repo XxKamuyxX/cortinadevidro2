@@ -32,10 +32,16 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Regra específica para workOrders - permitir leitura pública
+    // Regra específica para workOrders - permitir leitura e atualização pública
     match /workOrders/{osId} {
       // Permitir leitura pública (para visualizar a OS)
       allow read: if true;
+      
+      // Permitir atualização apenas dos campos de aprovação para usuários não autenticados
+      allow update: if request.resource.data.diff(resource.data).unchangedKeys()
+        .hasAll(['quoteId', 'clientName', 'scheduledDate', 'technician', 'status', 'checklist', 'notes', 'photos', 'technicalInspection', 'createdAt'])
+        && (request.resource.data.keys().hasOnly(['approved', 'rejected', 'approvedAt', 'rejectedAt', 'updatedAt'])
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approved', 'rejected', 'approvedAt', 'rejectedAt', 'updatedAt']));
       
       // Usuários autenticados podem fazer tudo
       allow read, write: if request.auth != null;

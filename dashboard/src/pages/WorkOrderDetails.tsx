@@ -535,7 +535,7 @@ export function WorkOrderDetails() {
         {/* Tab Content */}
         {activeTab === 'info' && (
           <>
-            {/* Send Approval Link */}
+            {/* Send Approval Link - Always visible for scheduled and in-progress */}
             {(workOrder.status === 'in-progress' || workOrder.status === 'scheduled') && (
               <Card>
                 <div className="flex items-center justify-between">
@@ -557,25 +557,23 @@ export function WorkOrderDetails() {
               </Card>
             )}
 
-            {/* WhatsApp Button */}
-            {workOrder.status === 'completed' && (
-              <Card>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-navy mb-2">Compartilhar OS</h2>
-                    <p className="text-sm text-slate-600">
-                      Envie o link da ordem de serviço para o cliente via WhatsApp
-                    </p>
-                  </div>
-                  <WhatsAppButton
-                    phoneNumber={clientPhone}
-                    clientName={workOrder.clientName}
-                    docType="OS"
-                    docLink={`${window.location.origin}/p/os/${id}`}
-                  />
+            {/* WhatsApp Button - Always visible to share OS link */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-navy mb-2">Compartilhar OS</h2>
+                  <p className="text-sm text-slate-600">
+                    Envie o link da ordem de serviço para o cliente via WhatsApp
+                  </p>
                 </div>
-              </Card>
-            )}
+                <WhatsAppButton
+                  phoneNumber={clientPhone}
+                  clientName={workOrder.clientName}
+                  docType="OS"
+                  docLink={`${window.location.origin}/p/os/${id}`}
+                />
+              </div>
+            </Card>
 
             {/* Generate Receipt */}
             {workOrder.status === 'completed' && (

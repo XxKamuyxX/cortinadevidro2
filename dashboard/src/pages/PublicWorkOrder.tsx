@@ -41,7 +41,7 @@ export function PublicWorkOrder() {
 
       const osDoc = await getDoc(doc(db, 'workOrders', osId));
       if (!osDoc.exists()) {
-        setError('Ordem de serviço não encontrada');
+        setError('Ordem de serviço não encontrada. Verifique se o link está correto.');
         setLoading(false);
         return;
       }
@@ -52,16 +52,28 @@ export function PublicWorkOrder() {
         ...osData,
       } as WorkOrder);
 
-      // Load quote if available
+      // Load quote if available (optional, don't fail if quote doesn't exist)
       if (osData.quoteId) {
-        const quoteDoc = await getDoc(doc(db, 'quotes', osData.quoteId));
-        if (quoteDoc.exists()) {
-          setQuote(quoteDoc.data());
+        try {
+          const quoteDoc = await getDoc(doc(db, 'quotes', osData.quoteId));
+          if (quoteDoc.exists()) {
+            setQuote(quoteDoc.data());
+          }
+        } catch (quoteErr) {
+          console.warn('Could not load quote:', quoteErr);
+          // Continue without quote data
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading work order:', err);
-      setError('Erro ao carregar ordem de serviço');
+      // Provide more specific error messages
+      if (err?.code === 'permission-denied') {
+        setError('Acesso negado. Verifique se o link está correto ou entre em contato com o suporte.');
+      } else if (err?.code === 'unavailable') {
+        setError('Serviço temporariamente indisponível. Tente novamente em alguns instantes.');
+      } else {
+        setError('Erro ao carregar ordem de serviço. Verifique se o link está correto.');
+      }
     } finally {
       setLoading(false);
     }
