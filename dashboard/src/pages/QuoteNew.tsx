@@ -303,23 +303,38 @@ export function QuoteNew() {
     try {
       // Sanitize items - include all fields including installation data
       const sanitizedItems = items.map((item) => {
+        // Validate required fields
+        if (!item.serviceId || !item.serviceName) {
+          throw new Error(`Item inválido: falta serviceId ou serviceName`);
+        }
+
         const sanitized: any = {
-          serviceId: item.serviceId,
-          serviceName: item.serviceName,
-          quantity: item.quantity || 0,
-          unitPrice: item.unitPrice || 0,
-          total: item.total || 0,
-          isCustom: item.isCustom || false,
+          serviceId: String(item.serviceId),
+          serviceName: String(item.serviceName),
+          quantity: Number(item.quantity) || 0,
+          unitPrice: Number(item.unitPrice) || 0,
+          total: Number(item.total) || 0,
         };
+
+        // Only add optional fields if they have values
+        if (item.isCustom !== undefined) sanitized.isCustom = Boolean(item.isCustom);
+        if (item.isInstallation !== undefined) sanitized.isInstallation = Boolean(item.isInstallation);
         
         // Add installation-specific fields if present
         if (item.isInstallation) {
-          sanitized.isInstallation = true;
-          if (item.pricingMethod) sanitized.pricingMethod = item.pricingMethod;
-          if (item.dimensions) sanitized.dimensions = item.dimensions;
-          if (item.glassColor) sanitized.glassColor = item.glassColor;
-          if (item.glassThickness) sanitized.glassThickness = item.glassThickness;
-          if (item.profileColor) sanitized.profileColor = item.profileColor;
+          if (item.pricingMethod) sanitized.pricingMethod = String(item.pricingMethod);
+          if (item.dimensions) {
+            sanitized.dimensions = {
+              width: Number(item.dimensions.width) || 0,
+              height: Number(item.dimensions.height) || 0,
+            };
+            if (item.dimensions.area !== undefined) {
+              sanitized.dimensions.area = Number(item.dimensions.area) || 0;
+            }
+          }
+          if (item.glassColor) sanitized.glassColor = String(item.glassColor);
+          if (item.glassThickness) sanitized.glassThickness = String(item.glassThickness);
+          if (item.profileColor) sanitized.profileColor = String(item.profileColor);
         }
         
         return sanitized;
@@ -337,17 +352,17 @@ export function QuoteNew() {
             }
           : null;
 
-      // Build quoteData - never use undefined
+      // Build quoteData - ensure all values are valid
       const quoteData: any = {
-        clientId: selectedClientId,
-        clientName: selectedClient.name,
+        clientId: String(selectedClientId),
+        clientName: String(selectedClient.name),
         items: sanitizedItems,
-        subtotal: subtotal || 0,
-        discount: discount || 0,
-        total: total || 0,
-        status: status || 'draft',
-        warranty: warranty || '',
-        observations: observations || '',
+        subtotal: Number(subtotal) || 0,
+        discount: Number(discount) || 0,
+        total: Number(total) || 0,
+        status: String(status) || 'draft',
+        warranty: String(warranty || ''),
+        observations: String(observations || ''),
         updatedAt: new Date(),
       };
 
@@ -361,16 +376,41 @@ export function QuoteNew() {
         quoteData.createdAt = new Date();
       }
 
+      // Validate data before saving
+      if (!quoteData.clientId || !quoteData.clientName) {
+        alert('Erro: Dados do cliente inválidos');
+        return;
+      }
+
+      if (!Array.isArray(quoteData.items) || quoteData.items.length === 0) {
+        alert('Adicione pelo menos um item ao orçamento');
+        return;
+      }
+
+      // Remove any undefined or null values from items
+      quoteData.items = quoteData.items.map((item: any) => {
+        const cleanItem: any = {};
+        Object.keys(item).forEach(key => {
+          if (item[key] !== undefined && item[key] !== null) {
+            cleanItem[key] = item[key];
+          }
+        });
+        return cleanItem;
+      });
+
       if (id) {
         await updateDoc(doc(db, 'quotes', id), quoteData);
+        alert('Orçamento atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'quotes'), quoteData);
+        alert('Orçamento salvo com sucesso!');
       }
 
       navigate('/quotes');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving quote:', error);
-      alert('Erro ao salvar orçamento');
+      const errorMessage = error?.message || 'Erro desconhecido';
+      alert(`Erro ao salvar orçamento: ${errorMessage}\n\nVerifique o console para mais detalhes.`);
     }
   };
 
