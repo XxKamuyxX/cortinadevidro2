@@ -3,9 +3,10 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { getDocs, addDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ClientForm } from '../components/ClientForm';
+import { useCompanyId, queryWithCompanyId } from '../lib/queries';
 
 interface Client {
   id: string;
@@ -33,14 +34,20 @@ export function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
+  const companyId = useCompanyId();
 
   useEffect(() => {
-    loadClients();
-  }, []);
+    if (companyId) {
+      loadClients();
+    }
+  }, [companyId]);
 
   const loadClients = async () => {
+    if (!companyId) return;
+    
     try {
-      const snapshot = await getDocs(collection(db, 'clients'));
+      const q = queryWithCompanyId('clients', companyId);
+      const snapshot = await getDocs(q);
       const clientsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -54,11 +61,14 @@ export function Clients() {
   };
 
   const handleSave = async (clientData: Omit<Client, 'id'>) => {
+    if (!companyId) return;
+    
     try {
+      const dataWithCompany = { ...clientData, companyId };
       if (editingClient) {
-        await updateDoc(doc(db, 'clients', editingClient.id), clientData);
+        await updateDoc(doc(db, 'clients', editingClient.id), dataWithCompany);
       } else {
-        await addDoc(collection(db, 'clients'), clientData);
+        await addDoc(collection(db, 'clients'), dataWithCompany);
       }
       await loadClients();
       setShowForm(false);

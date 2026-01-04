@@ -3,11 +3,12 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { CheckCircle2, Circle, Download, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Link } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
 import { ReceiptPDF } from '../components/ReceiptPDF';
+import { useCompanyId, queryWithCompanyId } from '../lib/queries';
 
 interface WorkOrder {
   id: string;
@@ -21,16 +22,22 @@ interface WorkOrder {
 }
 
 export function WorkOrders() {
+  const companyId = useCompanyId();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadWorkOrders();
-  }, []);
+    if (companyId) {
+      loadWorkOrders();
+    }
+  }, [companyId]);
 
   const loadWorkOrders = async () => {
+    if (!companyId) return;
+    
     try {
-      const snapshot = await getDocs(collection(db, 'workOrders'));
+      const q = queryWithCompanyId('workOrders', companyId);
+      const snapshot = await getDocs(q);
       const ordersData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

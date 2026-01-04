@@ -3,10 +3,11 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Plus, FileText, ClipboardList, MessageCircle, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { getDocs, addDoc, doc, getDoc, deleteDoc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Link, useNavigate } from 'react-router-dom';
 import { DatePickerModal } from '../components/DatePickerModal';
+import { useCompanyId, queryWithCompanyId } from '../lib/queries';
 
 interface Quote {
   id: string;
@@ -31,6 +32,7 @@ const statusColors = {
 };
 
 export function Quotes() {
+  const companyId = useCompanyId();
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -38,12 +40,17 @@ export function Quotes() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadQuotes();
-  }, []);
+    if (companyId) {
+      loadQuotes();
+    }
+  }, [companyId]);
 
   const loadQuotes = async () => {
+    if (!companyId) return;
+    
     try {
-      const snapshot = await getDocs(collection(db, 'quotes'));
+      const q = queryWithCompanyId('quotes', companyId);
+      const snapshot = await getDocs(q);
       const quotesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -136,7 +143,7 @@ export function Quotes() {
   };
 
   const handleDateConfirm = async (date: Date, time?: string) => {
-    if (!selectedQuote) return;
+    if (!selectedQuote || !companyId) return;
 
     try {
       const workOrderData: any = {
@@ -147,6 +154,7 @@ export function Quotes() {
         technician: '',
         status: 'scheduled',
         notes: '',
+        companyId,
         createdAt: new Date(),
       };
 

@@ -4,10 +4,11 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { FileText, Users, ClipboardList, Plus, DollarSign, TrendingUp } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { getDocs } from 'firebase/firestore';
+import { useCompanyId, queryWithCompanyId } from '../lib/queries';
 
 export function Dashboard() {
+  const companyId = useCompanyId();
   const [stats, setStats] = useState({
     openQuotes: 0,
     monthlyRevenue: 0,
@@ -17,17 +18,22 @@ export function Dashboard() {
   });
 
   useEffect(() => {
-    loadDashboardStats();
-  }, []);
+    if (companyId) {
+      loadDashboardStats();
+    }
+  }, [companyId]);
 
   const loadDashboardStats = async () => {
+    if (!companyId) return;
+    
     try {
       const now = new Date();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
       // Load quotes
-      const quotesSnapshot = await getDocs(collection(db, 'quotes'));
+      const quotesQuery = queryWithCompanyId('quotes', companyId);
+      const quotesSnapshot = await getDocs(quotesQuery);
       const quotes = quotesSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -39,7 +45,8 @@ export function Dashboard() {
       const conversionRate = totalQuotes > 0 ? (approvedQuotes / totalQuotes) * 100 : 0;
 
       // Load completed work orders for current month
-      const workOrdersSnapshot = await getDocs(collection(db, 'workOrders'));
+      const workOrdersQuery = queryWithCompanyId('workOrders', companyId);
+      const workOrdersSnapshot = await getDocs(workOrdersQuery);
       const workOrders = workOrdersSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),

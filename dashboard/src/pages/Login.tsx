@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/Button';
@@ -11,7 +11,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const { signIn, userMetadata } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -21,13 +21,27 @@ export function Login() {
 
     try {
       await signIn(email, password);
-      navigate('/dashboard');
+      // Redirect based on role - will be handled after auth state updates
+      // Navigation will happen in useEffect after userMetadata loads
     } catch (err: any) {
       setError(err.message || 'Erro ao fazer login. Verifique suas credenciais.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Redirect after login based on role
+  useEffect(() => {
+    if (userMetadata) {
+      if (userMetadata.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (userMetadata.role === 'tech') {
+        navigate('/tech/dashboard');
+      } else {
+        navigate('/dashboard'); // Fallback for legacy users
+      }
+    }
+  }, [userMetadata, navigate]);
 
   return (
     <div className="min-h-screen bg-navy flex items-center justify-center p-4">

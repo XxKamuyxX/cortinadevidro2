@@ -1,0 +1,39 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+
+export function RootRedirect() {
+  const { user, userMetadata, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      navigate('/login', { replace: true });
+      return;
+    }
+
+    if (userMetadata?.role === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+      return;
+    }
+
+    if (userMetadata?.role === 'tech') {
+      navigate('/tech/dashboard', { replace: true });
+      return;
+    }
+
+    // Fallback para usuários legados sem role
+    navigate('/admin/dashboard', { replace: true });
+  }, [user, userMetadata, loading, navigate]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
+        <p className="mt-4 text-slate-600">Carregando...</p>
+      </div>
+    </div>
+  );
+}

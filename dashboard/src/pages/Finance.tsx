@@ -3,10 +3,11 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { DollarSign, TrendingUp, CreditCard, Receipt, Target, Plus, Users, BarChart3 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
+import { getDocs, addDoc, Timestamp, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ExpenseModal } from '../components/ExpenseModal';
 import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useCompanyId, queryWithCompanyId } from '../lib/queries';
 
 interface FinanceStats {
   faturamento: number;
@@ -33,6 +34,7 @@ interface FinanceStats {
 }
 
 export function Finance() {
+  const companyId = useCompanyId();
   const [stats, setStats] = useState<FinanceStats>({
     faturamento: 0,
     contasAPagar: 0,
@@ -61,10 +63,14 @@ export function Finance() {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
 
   useEffect(() => {
-    loadFinanceData();
-  }, [period]);
+    if (companyId) {
+      loadFinanceData();
+    }
+  }, [period, companyId]);
 
   const loadFinanceData = async () => {
+    if (!companyId) return;
+    
     try {
       // Carregar receitas baseadas em OS concluídas (com completedDate)
       const now = new Date();
@@ -75,7 +81,8 @@ export function Finance() {
         ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
         : new Date(now.getFullYear(), 11, 31, 23, 59, 59);
 
-      const workOrdersSnapshot = await getDocs(collection(db, 'workOrders'));
+      const workOrdersQuery = queryWithCompanyId('workOrders', companyId);
+      const workOrdersSnapshot = await getDocs(workOrdersQuery);
       const completedOrders = workOrdersSnapshot.docs
         .map((doc) => ({ id: doc.id, ...doc.data() }))
         .filter((wo: any) => {
@@ -86,7 +93,8 @@ export function Finance() {
         });
 
       // Get quote totals for completed orders
-      const quotesSnapshot = await getDocs(collection(db, 'quotes'));
+      const quotesQuery = queryWithCompanyId('quotes', companyId);
+      const quotesSnapshot = await getDocs(quotesQuery);
       const quotesMap = new Map();
       quotesSnapshot.docs.forEach((doc) => {
         quotesMap.set(doc.id, doc.data());
@@ -127,7 +135,8 @@ export function Finance() {
           ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
           : new Date(now.getFullYear(), 11, 31, 23, 59, 59);
 
-        const expensesSnapshot = await getDocs(collection(db, 'expenses'));
+        const expensesQuery = queryWithCompanyId('expenses', companyId);
+        const expensesSnapshot = await getDocs(expensesQuery);
         expensesSnapshot.docs.forEach((doc) => {
           const expense = doc.data();
           const amount = expense.amount || 0;
@@ -178,7 +187,8 @@ export function Finance() {
       const margemLiquida = faturamento > 0 ? (lucroLiquido / faturamento) * 100 : 0;
 
       // Calcular KPIs adicionais
-      const clientsSnapshot = await getDocs(collection(db, 'clients'));
+      const clientsQuery = queryWithCompanyId('clients', companyId);
+      const clientsSnapshot = await getDocs(clientsQuery);
       const allClients = clientsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       const quantidadeClientes = allClients.length;
       
@@ -279,6 +289,8 @@ export function Finance() {
     paymentDate: Date;
     paid: boolean;
   }) => {
+    if (!companyId) return;
+    
     try {
       await addDoc(collection(db, 'expenses'), {
         description: expense.description,
@@ -286,6 +298,7 @@ export function Finance() {
         category: expense.category,
         paymentDate: Timestamp.fromDate(expense.paymentDate),
         paid: expense.paid,
+        companyId,
         createdAt: Timestamp.now(),
       });
       setShowExpenseModal(false);

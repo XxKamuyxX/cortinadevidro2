@@ -9,13 +9,16 @@ import { QuoteNew } from './pages/QuoteNew';
 import { WorkOrders } from './pages/WorkOrders';
 import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
-import { Calendar } from './pages/Calendar';
 import { PublicQuote } from './pages/PublicQuote';
 import { PublicWorkOrder } from './pages/PublicWorkOrder';
 import { PublicWorkOrderApprove } from './pages/PublicWorkOrderApprove';
 import { PublicReceipt } from './pages/PublicReceipt';
 import { WorkOrderDetails } from './pages/WorkOrderDetails';
 import { Feedback } from './pages/Feedback';
+import { TeamManagement } from './pages/TeamManagement';
+import { TechDashboard } from './pages/TechDashboard';
+import { AdminCalendar } from './pages/AdminCalendar';
+import { RootRedirect } from './components/RootRedirect';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -31,7 +34,61 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" />;
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, userMetadata, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
+          <p className="mt-4 text-slate-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!userMetadata || userMetadata.role !== 'admin') {
+    return <Navigate to="/tech/dashboard" />;
+  }
+
+  return <>{children}</>;
+}
+
+function TechRoute({ children }: { children: React.ReactNode }) {
+  const { user, userMetadata, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
+          <p className="mt-4 text-slate-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!userMetadata || userMetadata.role !== 'tech') {
+    return <Navigate to="/admin/dashboard" />;
+  }
+
+  return <>{children}</>;
 }
 
 function AppRoutes() {
@@ -44,11 +101,110 @@ function AppRoutes() {
       <Route path="/p/os/:osId/approve" element={<PublicWorkOrderApprove />} />
       <Route path="/p/receipt/:receiptId" element={<PublicReceipt />} />
       <Route path="/feedback/:osId" element={<Feedback />} />
+      {/* Rotas Admin */}
+      <Route
+        path="/admin/dashboard"
+        element={
+          <AdminRoute>
+            <Dashboard />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/calendar"
+        element={
+          <AdminRoute>
+            <AdminCalendar />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/team"
+        element={
+          <AdminRoute>
+            <TeamManagement />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/clients"
+        element={
+          <AdminRoute>
+            <Clients />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/clients/new"
+        element={
+          <AdminRoute>
+            <ClientNew />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/quotes"
+        element={
+          <AdminRoute>
+            <Quotes />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/quotes/new"
+        element={
+          <AdminRoute>
+            <QuoteNew />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/quotes/:id"
+        element={
+          <AdminRoute>
+            <QuoteNew />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/work-orders"
+        element={
+          <AdminRoute>
+            <WorkOrders />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/work-orders/:id"
+        element={
+          <AdminRoute>
+            <WorkOrderDetails />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/finance"
+        element={
+          <AdminRoute>
+            <Finance />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/settings"
+        element={
+          <AdminRoute>
+            <Settings />
+          </AdminRoute>
+        }
+      />
+      
+      {/* Rotas Legacy (redirecionam para admin) */}
       <Route
         path="/dashboard"
         element={
           <PrivateRoute>
-            <Dashboard />
+            <Navigate to="/admin/dashboard" replace />
           </PrivateRoute>
         }
       />
@@ -56,7 +212,7 @@ function AppRoutes() {
         path="/clients"
         element={
           <PrivateRoute>
-            <Clients />
+            <Navigate to="/admin/clients" replace />
           </PrivateRoute>
         }
       />
@@ -64,7 +220,7 @@ function AppRoutes() {
         path="/clients/new"
         element={
           <PrivateRoute>
-            <ClientNew />
+            <Navigate to="/admin/clients/new" replace />
           </PrivateRoute>
         }
       />
@@ -72,7 +228,7 @@ function AppRoutes() {
         path="/quotes"
         element={
           <PrivateRoute>
-            <Quotes />
+            <Navigate to="/admin/quotes" replace />
           </PrivateRoute>
         }
       />
@@ -80,39 +236,39 @@ function AppRoutes() {
         path="/quotes/new"
         element={
           <PrivateRoute>
-            <QuoteNew />
+            <Navigate to="/admin/quotes/new" replace />
           </PrivateRoute>
         }
       />
       <Route
         path="/quotes/:id"
         element={
-          <PrivateRoute>
+          <AdminRoute>
             <QuoteNew />
-          </PrivateRoute>
+          </AdminRoute>
         }
       />
       <Route
         path="/work-orders"
         element={
-          <PrivateRoute>
+          <AdminRoute>
             <WorkOrders />
-          </PrivateRoute>
+          </AdminRoute>
         }
       />
       <Route
         path="/work-orders/:id"
         element={
-          <PrivateRoute>
+          <AdminRoute>
             <WorkOrderDetails />
-          </PrivateRoute>
+          </AdminRoute>
         }
       />
       <Route
         path="/calendar"
         element={
           <PrivateRoute>
-            <Calendar />
+            <Navigate to="/admin/calendar" replace />
           </PrivateRoute>
         }
       />
@@ -120,7 +276,7 @@ function AppRoutes() {
         path="/finance"
         element={
           <PrivateRoute>
-            <Finance />
+            <Navigate to="/admin/finance" replace />
           </PrivateRoute>
         }
       />
@@ -128,11 +284,31 @@ function AppRoutes() {
         path="/settings"
         element={
           <PrivateRoute>
-            <Settings />
+            <Navigate to="/admin/settings" replace />
           </PrivateRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/dashboard" />} />
+      
+      {/* Rotas Tech */}
+      <Route
+        path="/tech/dashboard"
+        element={
+          <TechRoute>
+            <TechDashboard />
+          </TechRoute>
+        }
+      />
+      <Route
+        path="/tech/work-orders/:id"
+        element={
+          <TechRoute>
+            <WorkOrderDetails />
+          </TechRoute>
+        }
+      />
+      
+      {/* Redirect root based on role */}
+      <Route path="/" element={<RootRedirect />} />
     </Routes>
   );
 }
