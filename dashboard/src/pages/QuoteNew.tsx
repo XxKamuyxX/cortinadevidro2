@@ -447,6 +447,16 @@ export function QuoteNew() {
       });
 
       if (id) {
+        // For updates, ensure companyId is preserved if not in quoteData
+        // Get existing quote to preserve companyId if not already set
+        const existingQuote = await getDoc(doc(db, 'quotes', id));
+        if (existingQuote.exists()) {
+          const existingData = existingQuote.data();
+          // Preserve companyId if it exists in the document
+          if (existingData.companyId && !quoteData.companyId) {
+            quoteData.companyId = existingData.companyId;
+          }
+        }
         await updateDoc(doc(db, 'quotes', id), quoteData);
         alert('Orçamento atualizado com sucesso!');
       } else {

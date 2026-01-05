@@ -143,7 +143,9 @@ export function Settings() {
       `Coleções afetadas:\n` +
       `- clients\n` +
       `- workOrders\n` +
-      `- expenses\n\n` +
+      `- expenses\n` +
+      `- quotes\n` +
+      `- receipts\n\n` +
       `Deseja continuar?`
     )) {
       return;
@@ -154,7 +156,7 @@ export function Settings() {
     let errorCount = 0;
 
     try {
-      const collections = ['clients', 'workOrders', 'expenses'];
+      const collections = ['clients', 'workOrders', 'expenses', 'quotes', 'receipts'];
       
       for (const collectionName of collections) {
         try {
