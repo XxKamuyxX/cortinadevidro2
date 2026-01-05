@@ -12,7 +12,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { collection, doc, getDoc, getDocs, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { useCompanyId, queryWithCompanyId } from '../lib/queries';
+import { queryWithCompanyId } from '../lib/queries';
+import { useAuth } from '../contexts/AuthContext';
 import { useCompany } from '../hooks/useCompany';
 
 interface Service {
@@ -120,7 +121,8 @@ const VIP_CONDOMINIUMS = [
 export function QuoteNew() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const companyId = useCompanyId();
+  const { userMetadata } = useAuth();
+  const companyId = userMetadata?.companyId;
   const { company } = useCompany();
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');

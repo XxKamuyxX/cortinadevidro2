@@ -6,7 +6,8 @@ import { useState, useEffect } from 'react';
 import { getDocs, addDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ClientForm } from '../components/ClientForm';
-import { useCompanyId, queryWithCompanyId } from '../lib/queries';
+import { queryWithCompanyId } from '../lib/queries';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Client {
   id: string;
@@ -34,7 +35,8 @@ export function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
-  const companyId = useCompanyId();
+  const { userMetadata } = useAuth();
+  const companyId = userMetadata?.companyId;
 
   useEffect(() => {
     if (companyId) {

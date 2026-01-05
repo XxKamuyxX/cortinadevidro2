@@ -3,7 +3,7 @@ import { ClientForm } from '../components/ClientForm';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { useCompanyId } from '../lib/queries';
+import { useAuth } from '../contexts/AuthContext';
 
 const VIP_CONDOMINIUMS = [
   'Belvedere',
@@ -28,7 +28,8 @@ interface Client {
 
 export function ClientNew() {
   const navigate = useNavigate();
-  const companyId = useCompanyId();
+  const { userMetadata } = useAuth();
+  const companyId = userMetadata?.companyId;
 
   const handleSave = async (clientData: Omit<Client, 'id'>) => {
     // CRITICAL: Validate companyId before attempting any operation
