@@ -6,12 +6,13 @@ import { Save, Upload, X } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../hooks/useCompany';
 import { useStorage } from '../hooks/useStorage';
-import { useCompanyId } from '../lib/queries';
+import { useAuth } from '../contexts/AuthContext';
 import { compressFile } from '../utils/compressImage';
 
 export function CompanySettings() {
   const { company, loading, updateCompany } = useCompany();
-  const companyId = useCompanyId();
+  const { userMetadata } = useAuth();
+  const companyId = userMetadata?.companyId;
   const { uploadImage, uploading } = useStorage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -21,6 +22,7 @@ export function CompanySettings() {
     address: '',
     phone: '',
     email: '',
+    primaryColor: '#0F172A',
   });
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function CompanySettings() {
         address: company.address || '',
         phone: company.phone || '',
         email: company.email || '',
+        primaryColor: (company as any).primaryColor || '#0F172A',
       });
       setLogoUrl(company.logoUrl || null);
       setLogoPreview(company.logoUrl || null);
@@ -100,6 +103,7 @@ export function CompanySettings() {
         phone: formData.phone,
         email: formData.email || undefined,
         logoUrl: logoUrl || undefined,
+        primaryColor: formData.primaryColor,
       });
       alert('Dados da empresa salvos com sucesso!');
     } catch (error: any) {
@@ -129,55 +133,19 @@ export function CompanySettings() {
         </div>
 
         <Card>
-          <h2 className="text-xl font-bold text-navy mb-4">Informações da Empresa</h2>
+          <h2 className="text-xl font-bold text-navy mb-4">Personalização da Marca</h2>
           <div className="space-y-4">
             <Input
-              label="Nome da Empresa *"
+              label="Nome de Exibição *"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Nome que aparecerá nos PDFs"
+              placeholder="Nome que aparecerá no sistema e nos PDFs"
               required
             />
 
-            <Input
-              label="CNPJ"
-              value={formData.cnpj}
-              onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-              placeholder="00.000.000/0000-00"
-            />
-
-            <Input
-              label="Endereço Completo *"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="Rua, número, bairro, cidade - UF"
-              required
-            />
-
-            <Input
-              label="Telefone/WhatsApp *"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="(31) 99999-9999"
-              required
-            />
-
-            <Input
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="contato@empresa.com.br"
-            />
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="text-xl font-bold text-navy mb-4">Logo da Empresa</h2>
-          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Logo (PNG, JPG ou SVG)
+                Logo da Empresa
               </label>
               <div className="flex items-center gap-4">
                 <input
@@ -232,9 +200,68 @@ export function CompanySettings() {
                 </div>
               )}
               <p className="text-xs text-slate-500 mt-2">
-                O logo aparecerá no cabeçalho dos PDFs. Se não houver logo, será exibido apenas o nome da empresa.
+                O logo aparecerá no cabeçalho do sistema e dos PDFs. Se não houver logo, será exibido apenas o nome da empresa.
               </p>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Cor do Tema (Opcional)
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="color"
+                  value={formData.primaryColor}
+                  onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                  className="h-10 w-20 rounded border border-slate-300 cursor-pointer"
+                />
+                <Input
+                  value={formData.primaryColor}
+                  onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                  placeholder="#0F172A"
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Cor principal usada no tema do sistema (para uso futuro).
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-xl font-bold text-navy mb-4">Informações da Empresa</h2>
+          <div className="space-y-4">
+            <Input
+              label="CNPJ"
+              value={formData.cnpj}
+              onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
+              placeholder="00.000.000/0000-00"
+            />
+
+            <Input
+              label="Endereço Completo *"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              placeholder="Rua, número, bairro, cidade - UF"
+              required
+            />
+
+            <Input
+              label="Telefone/WhatsApp *"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="(31) 99999-9999"
+              required
+            />
+
+            <Input
+              label="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="contato@empresa.com.br"
+            />
           </div>
         </Card>
 

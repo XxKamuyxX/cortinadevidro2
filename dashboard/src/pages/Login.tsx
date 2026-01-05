@@ -49,9 +49,9 @@ export function Login() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-block bg-white rounded-full p-4 mb-4">
-            <img src="/logo.png" alt="House Manutenção" className="h-16 w-auto mx-auto" />
+            <img src="/logo.png" alt="Gestor Vitreo" className="h-16 w-auto mx-auto" />
           </div>
-          <h1 className="text-3xl font-serif font-bold text-white mb-2">House Manutenção</h1>
+          <h1 className="text-3xl font-serif font-bold text-white mb-2">Gestor Vitreo</h1>
           <p className="text-navy-300">Sistema de Gestão</p>
         </div>
 
@@ -100,7 +100,7 @@ export function Login() {
         </Card>
 
         <p className="text-center text-navy-300 text-sm mt-6">
-          © 2024 House Manutenção. Todos os direitos reservados.
+          © 2024 Gestor Vitreo. Todos os direitos reservados.
         </p>
       </div>
     </div>

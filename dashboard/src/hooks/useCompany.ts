@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { useCompanyId } from '../lib/queries';
+import { useAuth } from '../contexts/AuthContext';
 
 export interface CompanyData {
   id: string;
@@ -11,12 +11,14 @@ export interface CompanyData {
   phone: string;
   email?: string;
   logoUrl?: string;
+  primaryColor?: string;
   createdAt?: any;
   updatedAt?: any;
 }
 
 export function useCompany() {
-  const companyId = useCompanyId();
+  const { userMetadata } = useAuth();
+  const companyId = userMetadata?.companyId;
   const [company, setCompany] = useState<CompanyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +46,10 @@ export function useCompany() {
       } else {
         // Create default company document if it doesn't exist
         const defaultCompany: Omit<CompanyData, 'id'> = {
-          name: 'House Manutenção',
-          address: 'Rua Rio Grande do Norte, 726, Savassi',
-          phone: '(31) 98279-8513',
-          email: 'contato@housemanutencao.com.br',
+          name: 'Gestor Vitreo',
+          address: '',
+          phone: '',
+          email: '',
           createdAt: new Date(),
           updatedAt: new Date(),
         };

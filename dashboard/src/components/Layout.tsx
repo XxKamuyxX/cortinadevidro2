@@ -1,6 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useBranding } from '../contexts/BrandingContext';
 import { Button } from './ui/Button';
 import { 
   LayoutDashboard, 
@@ -22,9 +23,15 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { signOut } = useAuth();
+  const { branding } = useBranding();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Update document title dynamically
+  useEffect(() => {
+    document.title = `${branding.name} | Sistema`;
+  }, [branding.name]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -51,7 +58,11 @@ export function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center gap-3">
-              <img src="/logo.png" alt="House Manutenção" className="h-8 w-auto" />
+              {branding.logoUrl ? (
+                <img src={branding.logoUrl} alt={branding.name} className="h-8 w-auto" />
+              ) : (
+                <span className="text-xl font-bold text-navy">{branding.name}</span>
+              )}
             </Link>
 
             {/* Desktop Navigation */}

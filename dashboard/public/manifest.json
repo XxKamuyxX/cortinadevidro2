@@ -1,6 +1,6 @@
 {
-  "name": "House Manutenção - Dashboard",
-  "short_name": "House Manutenção",
+  "name": "Gestor Vitreo - Dashboard",
+  "short_name": "Gestor Vitreo",
   "description": "Sistema de gestão para manutenção de cortinas de vidro",
   "start_url": "/",
   "display": "standalone",
