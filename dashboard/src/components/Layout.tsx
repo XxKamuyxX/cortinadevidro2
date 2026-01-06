@@ -15,7 +15,8 @@ import {
   Settings as SettingsIcon,
   Calendar as CalendarIcon,
   UserCog,
-  Building2
+  Building2,
+  Crown
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -41,6 +42,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const isAdmin = userMetadata?.role === 'admin';
+  const isMaster = userMetadata?.role === 'master';
   
   const navItems = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -55,6 +57,8 @@ export function Layout({ children }: LayoutProps) {
     ] : []),
     { path: '/settings', icon: SettingsIcon, label: 'Configurações' },
   ];
+
+  const masterNavItem = isMaster ? { path: '/master', icon: Crown, label: '👑 Gestão SaaS' } : null;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -92,6 +96,19 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
+              {masterNavItem && (
+                <Link
+                  to={masterNavItem.path}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    isActive(masterNavItem.path)
+                      ? 'bg-gold text-white'
+                      : 'text-gold-700 hover:bg-gold-50'
+                  }`}
+                >
+                  <Crown className="w-5 h-5" />
+                  <span>{masterNavItem.label}</span>
+                </Link>
+              )}
             </nav>
 
             {/* User & Mobile Menu */}
@@ -139,6 +156,20 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
+              {masterNavItem && (
+                <Link
+                  to={masterNavItem.path}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    isActive(masterNavItem.path)
+                      ? 'bg-gold text-white'
+                      : 'text-gold-700 hover:bg-gold-50'
+                  }`}
+                >
+                  <Crown className="w-5 h-5" />
+                  <span>{masterNavItem.label}</span>
+                </Link>
+              )}
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"

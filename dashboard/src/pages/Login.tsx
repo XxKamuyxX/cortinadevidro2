@@ -33,7 +33,9 @@ export function Login() {
   // Redirect after login based on role
   useEffect(() => {
     if (userMetadata) {
-      if (userMetadata.role === 'admin') {
+      if (userMetadata.role === 'master') {
+        navigate('/master');
+      } else if (userMetadata.role === 'admin') {
         navigate('/admin/dashboard');
       } else if (userMetadata.role === 'tech') {
         navigate('/tech/dashboard');

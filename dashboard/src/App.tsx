@@ -20,6 +20,7 @@ import { TeamManagement } from './pages/TeamManagement';
 import { TechDashboard } from './pages/TechDashboard';
 import { AdminCalendar } from './pages/AdminCalendar';
 import { CompanySettings } from './pages/CompanySettings';
+import { MasterDashboard } from './pages/MasterDashboard';
 import { RootRedirect } from './components/RootRedirect';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -87,6 +88,31 @@ function TechRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!userMetadata || userMetadata.role !== 'tech') {
+    return <Navigate to="/admin/dashboard" />;
+  }
+
+  return <>{children}</>;
+}
+
+function MasterRoute({ children }: { children: React.ReactNode }) {
+  const { user, userMetadata, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
+          <p className="mt-4 text-slate-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (!userMetadata || userMetadata.role !== 'master') {
     return <Navigate to="/admin/dashboard" />;
   }
 
@@ -314,6 +340,16 @@ function AppRoutes() {
           <TechRoute>
             <WorkOrderDetails />
           </TechRoute>
+        }
+      />
+      
+      {/* Rotas Master */}
+      <Route
+        path="/master"
+        element={
+          <MasterRoute>
+            <MasterDashboard />
+          </MasterRoute>
         }
       />
       

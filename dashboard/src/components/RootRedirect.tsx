@@ -14,6 +14,11 @@ export function RootRedirect() {
       return;
     }
 
+    if (userMetadata?.role === 'master') {
+      navigate('/master', { replace: true });
+      return;
+    }
+
     if (userMetadata?.role === 'admin') {
       navigate('/admin/dashboard', { replace: true });
       return;

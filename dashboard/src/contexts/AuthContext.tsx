@@ -9,7 +9,7 @@ import {
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-export type UserRole = 'admin' | 'tech';
+export type UserRole = 'admin' | 'tech' | 'master';
 
 export interface UserMetadata {
   companyId: string;
