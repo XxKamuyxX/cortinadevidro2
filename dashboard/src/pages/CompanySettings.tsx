@@ -144,6 +144,12 @@ export function CompanySettings() {
       return;
     }
 
+    // Ensure companyId is available
+    if (!companyId) {
+      alert('Erro: ID da empresa não encontrado. Por favor, recarregue a página.');
+      return;
+    }
+
     setSaving(true);
     try {
       await updateCompany({
@@ -159,13 +165,13 @@ export function CompanySettings() {
       alert('Dados da empresa salvos com sucesso!');
     } catch (error: any) {
       console.error('Error saving company data:', error);
-      alert('Erro ao salvar dados da empresa');
+      alert(error.message || 'Erro ao salvar dados da empresa');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) {
+  if (loading || !companyId) {
     return (
       <Layout>
         <Card>
