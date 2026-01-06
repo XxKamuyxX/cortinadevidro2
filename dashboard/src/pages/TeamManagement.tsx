@@ -5,9 +5,13 @@ import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Plus, Mail, Shield, UserCog } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getDocs } from 'firebase/firestore';
+import { getDocs, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { queryWithCompanyId } from '../lib/queries';
+import { initializeApp, getApps } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { firebaseConfig } from '../lib/firebase';
+import { db } from '../lib/firebase';
 
 interface TeamMember {
   id: string;
@@ -18,7 +22,7 @@ interface TeamMember {
 }
 
 export function TeamManagement() {
-  const { createUser, userMetadata } = useAuth();
+  const { userMetadata } = useAuth();
   const companyId = userMetadata?.companyId;
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,20 +71,50 @@ export function TeamManagement() {
     }
 
     try {
-      await createUser(
+      // 1. Create a temporary 'secondary' app
+      // Check if it exists to avoid duplicates
+      const secondaryAppName = "SecondaryApp";
+      let secondaryApp = getApps().find(app => app.name === secondaryAppName);
+      
+      if (!secondaryApp) {
+        secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      }
+      
+      const secondaryAuth = getAuth(secondaryApp);
+
+      // 2. Create user on the SECONDARY auth (does not affect main session)
+      const userCredential = await createUserWithEmailAndPassword(
+        secondaryAuth,
         newMember.email,
-        newMember.password,
-        companyId,
-        newMember.role,
-        newMember.name || undefined
+        newMember.password
       );
+      const newUser = userCredential.user;
+
+      // 3. Create the user document in Firestore (using the MAIN db instance is fine)
+      await setDoc(doc(db, 'users', newUser.uid), {
+        email: newMember.email,
+        role: newMember.role,
+        companyId: companyId,
+        name: newMember.name || '',
+        createdAt: Timestamp.now(),
+      });
+
+      // 4. Sign out the secondary user immediately to be safe
+      await signOut(secondaryAuth);
+      
       alert('Membro adicionado com sucesso!');
       setShowAddModal(false);
       setNewMember({ email: '', password: '', name: '', role: 'tech' });
       loadMembers();
     } catch (error: any) {
       console.error('Error adding member:', error);
-      alert(error.message || 'Erro ao adicionar membro');
+      if (error.code === 'auth/email-already-in-use') {
+        alert('Este email já está em uso.');
+      } else if (error.code === 'auth/weak-password') {
+        alert('A senha é muito fraca. Use pelo menos 6 caracteres.');
+      } else {
+        alert(error.message || 'Erro ao adicionar membro');
+      }
     }
   };
 
