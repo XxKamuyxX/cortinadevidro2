@@ -2,10 +2,12 @@ import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
-import { Save, Trash2, Download, Plus } from 'lucide-react';
+import { Save, Trash2, Download, Plus, FileText } from 'lucide-react';
 import { WhatsAppButton } from '../components/WhatsAppButton';
 import { pdf } from '@react-pdf/renderer';
 import { QuotePDF } from '../components/QuotePDF';
+import { ContractModal, ContractData } from '../components/ContractModal';
+import { ContractPDF } from '../components/ContractPDF';
 import { InstallationItemModal } from '../components/InstallationItemModal';
 import { ClientForm } from '../components/ClientForm';
 import { useState, useEffect } from 'react';
@@ -136,6 +138,7 @@ export function QuoteNew() {
   const [showCustomService, setShowCustomService] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
+  const [showContractModal, setShowContractModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
   const [diagnosis, setDiagnosis] = useState({
@@ -539,6 +542,58 @@ export function QuoteNew() {
     }
   };
 
+  const handleGenerateContract = async (contractData: ContractData) => {
+    if (!selectedClientId || items.length === 0) {
+      alert('Complete o orçamento antes de gerar o contrato');
+      return;
+    }
+
+    const selectedClient = clients.find((c) => c.id === selectedClientId);
+    if (!selectedClient) return;
+
+    try {
+      // Prepare quote items for contract
+      const contractItems = items.map(item => ({
+        serviceName: item.serviceName,
+        quantity: item.quantity,
+        total: item.total,
+        dimensions: item.dimensions,
+      }));
+
+      const contractDoc = (
+        <ContractPDF
+          quoteItems={contractItems}
+          total={total}
+          contractData={contractData}
+          companyData={company ? {
+            name: company.name,
+            address: company.address,
+            phone: company.phone,
+            email: company.email,
+            logoUrl: company.logoUrl,
+            cnpj: company.cnpj,
+          } : undefined}
+        />
+      );
+
+      const blob = await pdf(contractDoc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Contrato_${selectedClient.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      setShowContractModal(false);
+      alert('Contrato gerado com sucesso!');
+    } catch (error) {
+      console.error('Error generating contract:', error);
+      alert('Erro ao gerar contrato');
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -569,6 +624,7 @@ export function QuoteNew() {
                 clientName={clients.find((c) => c.id === selectedClientId)?.name || ''}
                 docType="Orçamento"
                 docLink={`${window.location.origin}/p/quote/${id}`}
+                googleReviewUrl={(company as any)?.googleReviewUrl}
                 size="md"
               />
             )}
@@ -581,6 +637,17 @@ export function QuoteNew() {
               <Download className="w-5 h-5" />
               Gerar PDF
             </Button>
+            {id && status === 'approved' && (
+              <Button
+                variant="outline"
+                onClick={() => setShowContractModal(true)}
+                className="flex items-center gap-2 border-gold text-gold-700 hover:bg-gold-50"
+                disabled={!selectedClientId || items.length === 0}
+              >
+                <FileText className="w-5 h-5" />
+                Gerar Contrato
+              </Button>
+            )}
             <Button 
               variant="primary" 
               onClick={handleSave} 
@@ -946,6 +1013,25 @@ export function QuoteNew() {
             onSave={handleCreateClient}
             onCancel={() => setShowClientModal(false)}
             vipCondominiums={VIP_CONDOMINIUMS}
+          />
+        )}
+
+        {showContractModal && selectedClientId && (
+          <ContractModal
+            quote={{
+              id: id || '',
+              clientName: clients.find((c) => c.id === selectedClientId)?.name || '',
+              clientAddress: clients.find((c) => c.id === selectedClientId)?.address || '',
+              items: items.map(item => ({
+                serviceName: item.serviceName,
+                quantity: item.quantity,
+                total: item.total,
+                dimensions: item.dimensions,
+              })),
+              total,
+            }}
+            onClose={() => setShowContractModal(false)}
+            onGenerate={handleGenerateContract}
           />
         )}
       </div>

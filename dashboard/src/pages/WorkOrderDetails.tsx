@@ -9,6 +9,7 @@ import { X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Send } f
 import { ImageUpload } from '../components/ImageUpload';
 import { TechnicalInspection } from '../components/TechnicalInspection';
 import { WhatsAppButton } from '../components/WhatsAppButton';
+import { useCompany } from '../hooks/useCompany';
 
 interface WorkOrder {
   id: string;
@@ -33,6 +34,7 @@ interface WorkOrder {
 export function WorkOrderDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { company } = useCompany();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -579,6 +581,7 @@ export function WorkOrderDetails() {
                   clientName={workOrder.clientName}
                   docType="OS"
                   docLink={`${window.location.origin}/p/os/${id}`}
+                  googleReviewUrl={(company as any)?.googleReviewUrl}
                 />
               </div>
             </Card>

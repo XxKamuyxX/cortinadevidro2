@@ -6,6 +6,7 @@ interface WhatsAppButtonProps {
   clientName: string;
   docType: 'Orçamento' | 'OS' | 'Recibo';
   docLink: string;
+  googleReviewUrl?: string;
   variant?: 'primary' | 'secondary' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -16,6 +17,7 @@ export function WhatsAppButton({
   clientName,
   docType,
   docLink,
+  googleReviewUrl,
   variant = 'primary',
   size = 'md',
   className = '',
@@ -44,7 +46,15 @@ export function WhatsAppButton({
       'OS': `Olá ${clientName}, segue sua Ordem de Serviço digital: ${docLink}`,
       'Recibo': `Olá ${clientName}, confirmamos seu pagamento. Segue o Recibo: ${docLink}`,
     };
-    return templates[docType];
+    
+    let message = templates[docType];
+    
+    // Append review link if available
+    if (googleReviewUrl && googleReviewUrl.trim()) {
+      message += `\n\nAvalie nosso serviço: ${googleReviewUrl}`;
+    }
+    
+    return message;
   };
 
   const handleClick = () => {

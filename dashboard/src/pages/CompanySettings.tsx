@@ -2,12 +2,15 @@ import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Save, Upload, X } from 'lucide-react';
+import { Save, Upload, X, Plus, Edit2, Trash2, Package } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useCompany } from '../hooks/useCompany';
 import { useStorage } from '../hooks/useStorage';
 import { useAuth } from '../contexts/AuthContext';
 import { compressFile } from '../utils/compressImage';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { queryWithCompanyId } from '../lib/queries';
 
 export function CompanySettings() {
   const { company, loading, updateCompany } = useCompany();
@@ -23,6 +26,7 @@ export function CompanySettings() {
     phone: '',
     email: '',
     primaryColor: '#0F172A',
+    googleReviewUrl: '',
   });
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -32,6 +36,23 @@ export function CompanySettings() {
   const [compressing, setCompressing] = useState(false);
   const [compressingSignature, setCompressingSignature] = useState(false);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+  
+  // Services management
+  const [services, setServices] = useState<Array<{
+    id: string;
+    name: string;
+    description: string;
+    defaultPrice: number;
+    type: 'unit' | 'meter' | 'package';
+  }>>([]);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [editingService, setEditingService] = useState<{ id: string; name: string; description: string; defaultPrice: number; type: 'unit' | 'meter' | 'package' } | null>(null);
+  const [serviceForm, setServiceForm] = useState({
+    name: '',
+    description: '',
+    defaultPrice: 0,
+    type: 'unit' as 'unit' | 'meter' | 'package',
+  });
 
   useEffect(() => {
     if (company) {
@@ -42,6 +63,7 @@ export function CompanySettings() {
         phone: company.phone || '',
         email: company.email || '',
         primaryColor: (company as any).primaryColor || '#0F172A',
+        googleReviewUrl: (company as any).googleReviewUrl || '',
       });
       setLogoUrl(company.logoUrl || null);
       setLogoPreview(company.logoUrl || null);
@@ -49,6 +71,106 @@ export function CompanySettings() {
       setSignaturePreview((company as any).signatureUrl || null);
     }
   }, [company]);
+
+  useEffect(() => {
+    if (companyId) {
+      loadServices();
+    }
+  }, [companyId]);
+
+  const loadServices = async () => {
+    if (!companyId) return;
+    
+    try {
+      const q = queryWithCompanyId('services', companyId);
+      const snapshot = await getDocs(q);
+      const servicesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Array<{
+        id: string;
+        name: string;
+        description: string;
+        defaultPrice: number;
+        type: 'unit' | 'meter' | 'package';
+      }>;
+      setServices(servicesData);
+    } catch (error) {
+      console.error('Error loading services:', error);
+    }
+  };
+
+  const handleSaveService = async () => {
+    if (!companyId) {
+      alert('Erro: Empresa não identificada');
+      return;
+    }
+
+    if (!serviceForm.name || !serviceForm.description || serviceForm.defaultPrice <= 0) {
+      alert('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    try {
+      if (editingService) {
+        // Update existing service
+        await updateDoc(doc(db, 'services', editingService.id), {
+          name: serviceForm.name,
+          description: serviceForm.description,
+          defaultPrice: serviceForm.defaultPrice,
+          type: serviceForm.type,
+          updatedAt: new Date(),
+        });
+        alert('Serviço atualizado com sucesso!');
+      } else {
+        // Create new service
+        await addDoc(collection(db, 'services'), {
+          name: serviceForm.name,
+          description: serviceForm.description,
+          defaultPrice: serviceForm.defaultPrice,
+          type: serviceForm.type,
+          companyId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        alert('Serviço criado com sucesso!');
+      }
+      
+      setShowServiceModal(false);
+      setEditingService(null);
+      setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+      loadServices();
+    } catch (error) {
+      console.error('Error saving service:', error);
+      alert('Erro ao salvar serviço');
+    }
+  };
+
+  const handleEditService = (service: typeof services[0]) => {
+    setEditingService(service);
+    setServiceForm({
+      name: service.name,
+      description: service.description,
+      defaultPrice: service.defaultPrice,
+      type: service.type,
+    });
+    setShowServiceModal(true);
+  };
+
+  const handleDeleteService = async (serviceId: string) => {
+    if (!confirm('Tem certeza que deseja excluir este serviço?')) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'services', serviceId));
+      alert('Serviço excluído com sucesso!');
+      loadServices();
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      alert('Erro ao excluir serviço');
+    }
+  };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -166,6 +288,9 @@ export function CompanySettings() {
       }
       if (formData.email && formData.email.trim()) {
         cleanData.email = formData.email.trim();
+      }
+      if (formData.googleReviewUrl && formData.googleReviewUrl.trim()) {
+        cleanData.googleReviewUrl = formData.googleReviewUrl.trim();
       }
       if (logoUrl) {
         cleanData.logoUrl = logoUrl;
@@ -384,7 +509,87 @@ export function CompanySettings() {
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="contato@empresa.com.br"
             />
+
+            <Input
+              label="Link de Avaliação Google"
+              type="url"
+              value={formData.googleReviewUrl}
+              onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
+              placeholder="https://g.page/r/..."
+            />
+            <p className="text-xs text-slate-500">
+              Link do Google Maps para avaliações. Será incluído nas mensagens do WhatsApp.
+            </p>
           </div>
+        </Card>
+
+        {/* Services Management */}
+        <Card>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-navy">Meus Serviços</h2>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setEditingService(null);
+                setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+                setShowServiceModal(true);
+              }}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Adicionar Serviço
+            </Button>
+          </div>
+          
+          {services.length === 0 ? (
+            <p className="text-center text-slate-500 py-8">
+              Nenhum serviço cadastrado. Clique em "Adicionar Serviço" para começar.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {services.map((service) => (
+                <div
+                  key={service.id}
+                  className="p-4 border border-slate-200 rounded-lg bg-slate-50 flex justify-between items-start"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Package className="w-5 h-5 text-navy" />
+                      <h3 className="font-bold text-navy">{service.name}</h3>
+                      <span className="px-2 py-1 bg-navy-100 text-navy-700 rounded text-xs">
+                        {service.type === 'unit' ? 'Unidade' : service.type === 'meter' ? 'Metro' : 'Pacote'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-600 mb-2">{service.description}</p>
+                    <p className="text-sm font-medium text-navy">
+                      Preço padrão: R$ {service.defaultPrice.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditService(service)}
+                      className="flex items-center gap-1"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteService(service.id)}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Excluir
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
 
         <Card>
@@ -465,6 +670,98 @@ export function CompanySettings() {
             {saving ? 'Salvando...' : 'Salvar Dados'}
           </Button>
         </div>
+
+        {/* Service Modal */}
+        {showServiceModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="max-w-md w-full">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-navy">
+                  {editingService ? 'Editar Serviço' : 'Novo Serviço'}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowServiceModal(false);
+                    setEditingService(null);
+                    setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                <Input
+                  label="Nome do Serviço *"
+                  value={serviceForm.name}
+                  onChange={(e) => setServiceForm({ ...serviceForm, name: e.target.value })}
+                  placeholder="Ex: Troca de Roldanas"
+                  required
+                />
+                
+                <Input
+                  label="Descrição *"
+                  value={serviceForm.description}
+                  onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })}
+                  placeholder="Descrição detalhada do serviço"
+                  required
+                />
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Preço Padrão (R$) *"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={serviceForm.defaultPrice}
+                    onChange={(e) => setServiceForm({ ...serviceForm, defaultPrice: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Tipo *
+                    </label>
+                    <select
+                      value={serviceForm.type}
+                      onChange={(e) => setServiceForm({ ...serviceForm, type: e.target.value as any })}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    >
+                      <option value="unit">Por Unidade</option>
+                      <option value="meter">Por Metro</option>
+                      <option value="package">Pacote</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setShowServiceModal(false);
+                      setEditingService(null);
+                      setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={handleSaveService}
+                    className="flex-1"
+                  >
+                    {editingService ? 'Salvar Alterações' : 'Criar Serviço'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </Layout>
   );
