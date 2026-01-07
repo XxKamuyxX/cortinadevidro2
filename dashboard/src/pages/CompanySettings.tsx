@@ -152,16 +152,29 @@ export function CompanySettings() {
 
     setSaving(true);
     try {
-      await updateCompany({
-        name: formData.name,
-        cnpj: formData.cnpj || undefined,
-        address: formData.address,
-        phone: formData.phone,
-        email: formData.email || undefined,
-        logoUrl: logoUrl || undefined,
-        signatureUrl: signatureUrl || undefined,
-        primaryColor: formData.primaryColor,
-      });
+      // Sanitize payload: remove undefined values and convert to empty string or null
+      const cleanData: any = {
+        name: formData.name.trim(),
+        address: formData.address.trim(),
+        phone: formData.phone.trim(),
+        primaryColor: formData.primaryColor || '#0F172A',
+      };
+
+      // Optional fields: use empty string instead of undefined
+      if (formData.cnpj && formData.cnpj.trim()) {
+        cleanData.cnpj = formData.cnpj.trim();
+      }
+      if (formData.email && formData.email.trim()) {
+        cleanData.email = formData.email.trim();
+      }
+      if (logoUrl) {
+        cleanData.logoUrl = logoUrl;
+      }
+      if (signatureUrl) {
+        cleanData.signatureUrl = signatureUrl;
+      }
+
+      await updateCompany(cleanData);
       alert('Dados da empresa salvos com sucesso!');
     } catch (error: any) {
       console.error('Error saving company data:', error);
@@ -262,23 +275,75 @@ export function CompanySettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-3">
                 Cor do Tema (Opcional)
               </label>
+              
+              {/* Preset Colors */}
+              <div className="mb-4">
+                <p className="text-xs text-slate-600 mb-2">Cores pré-definidas:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { name: 'Navy', value: '#0F172A' },
+                    { name: 'Azul', value: '#1E40AF' },
+                    { name: 'Verde', value: '#059669' },
+                    { name: 'Amarelo', value: '#D97706' },
+                    { name: 'Vermelho', value: '#DC2626' },
+                    { name: 'Roxo', value: '#7C3AED' },
+                    { name: 'Rosa', value: '#DB2777' },
+                    { name: 'Teal', value: '#0D9488' },
+                  ].map((color) => (
+                    <button
+                      key={color.value}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, primaryColor: color.value })}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                        formData.primaryColor === color.value
+                          ? 'border-navy bg-navy-50'
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div
+                        className="w-6 h-6 rounded border border-slate-300"
+                        style={{ backgroundColor: color.value }}
+                      />
+                      <span className="text-xs font-medium text-slate-700">{color.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom Color Picker */}
               <div className="flex items-center gap-4">
-                <input
-                  type="color"
-                  value={formData.primaryColor}
-                  onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
-                  className="h-10 w-20 rounded border border-slate-300 cursor-pointer"
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={formData.primaryColor}
+                    onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
+                    className="h-12 w-16 rounded-lg border-2 border-slate-300 cursor-pointer"
+                    title="Selecionar cor personalizada"
+                  />
+                  <span className="text-xs text-slate-600">Personalizada</span>
+                </div>
                 <Input
                   value={formData.primaryColor}
                   onChange={(e) => setFormData({ ...formData, primaryColor: e.target.value })}
                   placeholder="#0F172A"
-                  className="flex-1"
+                  className="flex-1 max-w-xs"
                 />
               </div>
+              
+              {/* Preview */}
+              <div className="mt-3 p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <p className="text-xs text-slate-600 mb-2">Preview:</p>
+                <div 
+                  className="h-8 rounded flex items-center justify-center text-white font-medium text-sm"
+                  style={{ backgroundColor: formData.primaryColor }}
+                >
+                  Cor selecionada
+                </div>
+              </div>
+              
               <p className="text-xs text-slate-500 mt-2">
                 Cor principal usada no tema do sistema (para uso futuro).
               </p>
