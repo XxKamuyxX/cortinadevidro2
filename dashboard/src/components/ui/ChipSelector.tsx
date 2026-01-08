@@ -1,5 +1,3 @@
-import { useBranding } from '../../contexts/BrandingContext';
-
 interface ChipSelectorOption {
   value: string;
   label: string;
@@ -22,8 +20,6 @@ export function ChipSelector({
   className = '',
   multiple = false,
 }: ChipSelectorProps) {
-  const { branding } = useBranding();
-  const primaryColor = branding.primaryColor || '#0F172A';
 
   // Normalize options to array of objects
   const normalizedOptions: ChipSelectorOption[] = options.map((opt) =>
@@ -75,18 +71,10 @@ export function ChipSelector({
                 focus:outline-none focus:ring-2 focus:ring-offset-2
                 ${
                   selected
-                    ? 'text-white shadow-md'
-                    : 'text-slate-700 bg-white border-2 border-slate-300 hover:border-slate-400'
+                    ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md shadow-primary/20'
+                    : 'text-slate-700 bg-white border-2 border-slate-300 hover:border-primary/30'
                 }
               `}
-              style={
-                selected
-                  ? {
-                      backgroundColor: primaryColor,
-                      borderColor: primaryColor,
-                    }
-                  : {}
-              }
             >
               {option.label}
             </button>

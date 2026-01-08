@@ -76,7 +76,7 @@ export function Layout({ children }: LayoutProps) {
               {branding.logoUrl ? (
                 <img src={branding.logoUrl} alt={branding.name} className="h-8 w-auto" />
               ) : (
-                <span className="text-xl font-bold text-navy">{branding.name}</span>
+                <span className="text-xl font-bold text-secondary">{branding.name}</span>
               )}
             </Link>
 
@@ -90,8 +90,8 @@ export function Layout({ children }: LayoutProps) {
                     to={item.path}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                       isActive(item.path)
-                        ? 'bg-navy text-white'
-                        : 'text-slate-700 hover:bg-navy-50'
+                        ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md shadow-primary/20'
+                        : 'text-slate-700 hover:bg-glass-blue'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -150,8 +150,8 @@ export function Layout({ children }: LayoutProps) {
                     onClick={() => setMobileMenuOpen(false)}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                       isActive(item.path)
-                        ? 'bg-navy text-white'
-                        : 'text-slate-700 hover:bg-navy-50'
+                        ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md shadow-primary/20'
+                        : 'text-slate-700 hover:bg-glass-blue'
                     }`}
                   >
                     <Icon className="w-5 h-5" />

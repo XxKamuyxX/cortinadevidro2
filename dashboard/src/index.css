@@ -10,11 +10,11 @@
 
 @layer utilities {
   .text-navy {
-    @apply text-navy-900;
+    @apply text-secondary;
   }
   
   .bg-navy {
-    @apply bg-navy-900;
+    @apply bg-gradient-to-r from-primary to-primary-dark;
   }
   
   .text-gold {

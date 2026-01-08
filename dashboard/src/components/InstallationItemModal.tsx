@@ -25,6 +25,7 @@ interface InstallationItemModalProps {
     isInstallation: boolean;
   }) => void;
   initialItem?: any;
+  isInstallation?: boolean;
 }
 
 export function InstallationItemModal({
@@ -32,6 +33,7 @@ export function InstallationItemModal({
   onClose,
   onSave,
   initialItem,
+  isInstallation = true,
 }: InstallationItemModalProps) {
   const [serviceName, setServiceName] = useState('');
   const [pricingMethod, setPricingMethod] = useState<'m2' | 'linear' | 'fixed' | 'unit'>('unit');
@@ -79,7 +81,7 @@ export function InstallationItemModal({
   useEffect(() => {
     if (initialItem) {
       setServiceName(initialItem.serviceName || '');
-      setPricingMethod(initialItem.pricingMethod || 'unit');
+      setPricingMethod(initialItem.pricingMethod || (initialItem.isInstallation ? 'm2' : 'unit'));
       setWidthDisplay(toDisplay(initialItem.dimensions?.width || 0));
       setHeightDisplay(toDisplay(initialItem.dimensions?.height || 0));
       setUnitPriceDisplay(toDisplay(initialItem.unitPrice || 0));
@@ -93,7 +95,7 @@ export function InstallationItemModal({
     } else {
       // Reset form - empty strings for clean inputs
       setServiceName('');
-      setPricingMethod('unit');
+      setPricingMethod(isInstallation ? 'm2' : 'unit');
       setWidthDisplay('');
       setHeightDisplay('');
       setUnitPriceDisplay('');
@@ -105,7 +107,7 @@ export function InstallationItemModal({
       setCustomServiceName('');
       setIsManualOverride(false);
     }
-  }, [initialItem, isOpen]);
+  }, [initialItem, isOpen, isInstallation]);
 
   // Calculate total based on pricing method
   useEffect(() => {
@@ -118,8 +120,9 @@ export function InstallationItemModal({
     switch (pricingMethod) {
       case 'm2':
         if (width > 0 && height > 0 && unitPrice > 0) {
-          const area = width * height;
-          calculatedTotal = area * quantity * unitPrice;
+          // Convert mm² to m²: (width_mm * height_mm) / 1000000
+          const areaM2 = (width * height) / 1000000;
+          calculatedTotal = areaM2 * quantity * unitPrice;
         }
         break;
       case 'linear':
@@ -179,12 +182,12 @@ export function InstallationItemModal({
       dimensions: {
         width,
         height: pricingMethod === 'linear' ? 0 : height,
-        area: pricingMethod === 'm2' && width > 0 && height > 0 ? width * height : undefined,
+        area: pricingMethod === 'm2' && width > 0 && height > 0 ? (width * height) / 1000000 : undefined,
       },
-      glassColor,
-      glassThickness,
-      profileColor,
-      isInstallation: true,
+      glassColor: isInstallation ? glassColor : undefined,
+      glassThickness: isInstallation ? glassThickness : undefined,
+      profileColor: isInstallation ? profileColor : undefined,
+      isInstallation,
     });
 
     onClose();
@@ -196,7 +199,7 @@ export function InstallationItemModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-navy">
+          <h2 className="text-2xl font-bold text-secondary">
             {initialItem ? 'Editar Item de Instalação' : 'Adicionar Item de Instalação'}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
@@ -216,6 +219,10 @@ export function InstallationItemModal({
               options={[
                 { value: '', label: 'Selecione o tipo de serviço...' },
                 ...installationServices,
+                // Add template name if it's not in the list
+                ...(initialItem?.serviceName && !installationServices.find(s => s.value === initialItem.serviceName) 
+                  ? [{ value: initialItem.serviceName, label: initialItem.serviceName }]
+                  : []),
               ]}
               required
             />
@@ -225,7 +232,7 @@ export function InstallationItemModal({
                 placeholder="Especifique o tipo de serviço"
                 value={customServiceName}
                 onChange={(e) => setCustomServiceName(e.target.value)}
-                className="w-full mt-2 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                className="w-full mt-2 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             )}
@@ -256,14 +263,15 @@ export function InstallationItemModal({
             {/* Width - Always shown for m2, linear, and fixed */}
             {(pricingMethod === 'm2' || pricingMethod === 'linear' || pricingMethod === 'fixed') && (
               <div>
+                <label className="block text-xs text-slate-600 mb-1">Largura (mm)</label>
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={widthDisplay}
                   onChange={(e) => setWidthDisplay(e.target.value)}
-                  placeholder="Ex: 2,50"
-                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  placeholder="Largura (mm)"
+                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -272,14 +280,15 @@ export function InstallationItemModal({
             {/* Height - Only for m2 and fixed */}
             {(pricingMethod === 'm2' || pricingMethod === 'fixed') && (
               <div>
+                <label className="block text-xs text-slate-600 mb-1">Altura (mm)</label>
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
+                  step="1"
                   value={heightDisplay}
                   onChange={(e) => setHeightDisplay(e.target.value)}
-                  placeholder="Ex: 2,00"
-                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  placeholder="Altura (mm)"
+                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
                   required={pricingMethod === 'm2'}
                 />
               </div>
@@ -287,14 +296,15 @@ export function InstallationItemModal({
 
             {/* Quantity - For all methods */}
             <div>
+              <label className="block text-xs text-slate-600 mb-1">Qtd</label>
               <input
                 type="number"
                 min="1"
                 step="1"
                 value={quantityDisplay}
                 onChange={(e) => setQuantityDisplay(e.target.value)}
-                placeholder="Ex: 1"
-                className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                placeholder="Qtd"
+                className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
             </div>
@@ -302,14 +312,15 @@ export function InstallationItemModal({
             {/* Unit Price - For m2, linear, and unit - Hidden if m2 since price comes from service catalog */}
             {pricingMethod !== 'fixed' && pricingMethod !== 'm2' && (
               <div>
+                <label className="block text-xs text-slate-600 mb-1">Valor (R$)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={unitPriceDisplay}
                   onChange={(e) => setUnitPriceDisplay(e.target.value)}
-                  placeholder={pricingMethod === 'linear' ? "Ex: 50,00/m" : "Ex: 150,00"}
-                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  placeholder="Valor (R$)"
+                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -318,14 +329,15 @@ export function InstallationItemModal({
             {/* Unit Price for m2 - Only shown if manually setting price */}
             {pricingMethod === 'm2' && (
               <div>
+                <label className="block text-xs text-slate-600 mb-1">Valor (R$)</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={unitPriceDisplay}
                   onChange={(e) => setUnitPriceDisplay(e.target.value)}
-                  placeholder="Ex: 150,00"
-                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  placeholder="Valor (R$)"
+                  className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary"
                   required
                 />
               </div>
@@ -336,10 +348,10 @@ export function InstallationItemModal({
           {pricingMethod === 'm2' && width > 0 && height > 0 && (
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-700">
-                <span className="font-medium">Área Calculada:</span> {(width * height).toFixed(2)} m²
+                <span className="font-medium">Área Calculada:</span> {((width * height) / 1000000).toFixed(2)} m²
                 {quantity > 1 && (
                   <span className="ml-2">
-                    ({quantityDisplay || '1'}x = {((width * height) * quantity).toFixed(2)} m² total)
+                    ({quantityDisplay || '1'}x = {(((width * height) / 1000000) * quantity).toFixed(2)} m² total)
                   </span>
                 )}
               </p>
@@ -356,7 +368,7 @@ export function InstallationItemModal({
                 <button
                   type="button"
                   onClick={() => setIsManualOverride(!isManualOverride)}
-                  className="flex items-center gap-1 text-xs text-slate-600 hover:text-navy"
+                  className="flex items-center gap-1 text-xs text-slate-600 hover:text-secondary"
                   title={isManualOverride ? 'Desbloquear edição automática' : 'Editar manualmente'}
                 >
                   {isManualOverride ? (
@@ -385,7 +397,7 @@ export function InstallationItemModal({
                 }
               }}
               placeholder="0,00"
-              className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy font-medium text-navy"
+              className="w-full px-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-medium text-navy"
               required
               readOnly={!isManualOverride && pricingMethod !== 'fixed'}
             />
@@ -410,26 +422,32 @@ export function InstallationItemModal({
           <div className="pt-4 border-t border-slate-200 space-y-4">
             <h3 className="text-sm font-medium text-navy mb-3">Especificações do Vidro</h3>
             
-            <ChipSelector
-              label="Cor do Vidro"
-              options={['Incolor', 'Verde', 'Fumê', 'Bronze', 'Astriado', 'Pontilhado']}
-              selected={glassColor}
-              onChange={(value) => setGlassColor(typeof value === 'string' ? value : value[0] || '')}
-            />
+            {isInstallation && (
+              <>
+                <ChipSelector
+                  label="Cor do Vidro"
+                  options={['Incolor', 'Verde', 'Fumê', 'Bronze']}
+                  selected={glassColor}
+                  onChange={(value) => setGlassColor(typeof value === 'string' ? value : value[0] || '')}
+                />
 
-            <ChipSelector
-              label="Espessura do Vidro"
-              options={['6mm', '8mm', '10mm', '12mm']}
-              selected={glassThickness}
-              onChange={(value) => setGlassThickness(typeof value === 'string' ? value : value[0] || '')}
-            />
+                <ChipSelector
+                  label="Espessura do Vidro"
+                  options={['4mm', '6mm', '8mm', '10mm', '12mm']}
+                  selected={glassThickness}
+                  onChange={(value) => setGlassThickness(typeof value === 'string' ? value : value[0] || '')}
+                />
+              </>
+            )}
 
-            <ChipSelector
-              label="Cor do Perfil"
-              options={['Branco', 'Preto', 'Fosco', 'Bronze', 'Cromado']}
-              selected={profileColor}
-              onChange={(value) => setProfileColor(typeof value === 'string' ? value : value[0] || '')}
-            />
+            {isInstallation && (
+              <ChipSelector
+                label="Cor do Perfil"
+                options={['Branco', 'Preto', 'Fosco', 'Bronze', 'Cromado']}
+                selected={profileColor}
+                onChange={(value) => setProfileColor(typeof value === 'string' ? value : value[0] || '')}
+              />
+            )}
           </div>
 
           {/* Action Buttons */}

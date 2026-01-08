@@ -509,6 +509,48 @@ export function QuoteNew() {
 
 
 
+  const handleCreateWorkOrder = async () => {
+    if (!selectedClientId || items.length === 0 || !id) {
+      alert('Complete o orçamento e salve antes de gerar a OS');
+      return;
+    }
+
+    if (!companyId) {
+      alert('Erro: Empresa não identificada');
+      return;
+    }
+
+    const selectedClient = clients.find((c) => c.id === selectedClientId);
+    if (!selectedClient) return;
+
+    try {
+      const workOrderData = {
+        quoteId: id,
+        clientId: selectedClientId,
+        clientName: selectedClient.name,
+        clientPhone: selectedClient.phone,
+        clientAddress: selectedClient.address,
+        scheduledDate: new Date().toISOString().split('T')[0],
+        technician: '',
+        status: 'scheduled' as const,
+        checklist: items.map((item) => ({
+          task: `${item.serviceName} - Qtd: ${item.quantity}`,
+          completed: false,
+        })),
+        notes: observations || '',
+        companyId: companyId,
+        createdAt: new Date(),
+      };
+
+      const docRef = await addDoc(collection(db, 'workOrders'), workOrderData);
+      alert('Ordem de Serviço criada com sucesso!');
+      navigate(`/work-orders/${docRef.id}`);
+    } catch (error: any) {
+      console.error('Error creating work order:', error);
+      alert(`Erro ao criar ordem de serviço: ${error.message}`);
+    }
+  };
+
   const handleGeneratePDF = async () => {
     if (!selectedClientId || items.length === 0) {
       alert('Complete o orçamento antes de gerar o PDF');
@@ -672,15 +714,24 @@ export function QuoteNew() {
               Gerar PDF
             </Button>
             {id && status === 'approved' && (
-              <Button
-                variant="outline"
-                onClick={() => setShowContractModal(true)}
-                className="flex items-center gap-2 border-gold text-gold-700 hover:bg-gold-50"
-                disabled={!selectedClientId || items.length === 0}
-              >
-                <FileText className="w-5 h-5" />
-                Gerar Contrato
-              </Button>
+              <>
+                <Button
+                  variant="primary"
+                  onClick={handleCreateWorkOrder}
+                  className="flex items-center gap-2"
+                >
+                  🛠️ Gerar Ordem de Serviço
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowContractModal(true)}
+                  className="flex items-center gap-2 border-gold text-gold-700 hover:bg-gold-50"
+                  disabled={!selectedClientId || items.length === 0}
+                >
+                  <FileText className="w-5 h-5" />
+                  Gerar Contrato
+                </Button>
+              </>
             )}
             <Button 
               variant="primary" 

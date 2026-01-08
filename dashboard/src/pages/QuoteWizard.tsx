@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { InstallationItemModal } from '../components/InstallationItemModal';
+import { TemplateSelector } from '../components/TemplateSelector';
 import { ClientForm } from '../components/ClientForm';
 import { Search, Plus, Square, Wrench, ArrowLeft, ArrowRight, Save, Download, X, Trash2 } from 'lucide-react';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
@@ -78,8 +79,10 @@ export function QuoteWizard() {
   
   // UI state
   const [showClientModal, setShowClientModal] = useState(false);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -284,11 +287,11 @@ export function QuoteWizard() {
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={() => navigate('/quotes')}
-              className="text-slate-600 hover:text-navy"
+              className="text-slate-600 hover:text-secondary"
             >
               <X className="w-5 h-5" />
             </button>
-            <h1 className="text-lg font-bold text-navy">Novo Orçamento</h1>
+            <h1 className="text-lg font-bold text-secondary">Novo Orçamento</h1>
             <div className="w-5" />
           </div>
           <div className="flex gap-2 mt-3">
@@ -296,7 +299,7 @@ export function QuoteWizard() {
               <div
                 key={step}
                 className={`flex-1 h-1 rounded-full ${
-                  step <= currentStep ? 'bg-navy' : 'bg-slate-200'
+                  step <= currentStep ? 'bg-gradient-to-r from-primary to-primary-dark' : 'bg-slate-200'
                 }`}
               />
             ))}
@@ -309,8 +312,8 @@ export function QuoteWizard() {
           </p>
         </div>
 
-        {/* Step Content - Takes remaining space */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Step Content - Takes remaining space with padding for fixed footer */}
+        <div className="flex-1 overflow-y-auto pb-24">
           {/* STEP 1: CLIENT SELECTION */}
           {currentStep === 1 && (
             <div className="p-4 space-y-4">
@@ -340,7 +343,7 @@ export function QuoteWizard() {
                         key={client.id}
                         className={`p-4 cursor-pointer transition-all border border-slate-200 rounded-lg bg-white ${
                           selectedClientId === client.id
-                            ? 'border-2 border-navy bg-navy-50'
+                            ? 'border-2 border-primary bg-glass-blue'
                             : 'hover:bg-slate-50'
                         }`}
                         onClick={() => {
@@ -353,7 +356,7 @@ export function QuoteWizard() {
                           }, 300);
                         }}
                       >
-                        <h3 className="font-bold text-navy">{client.name}</h3>
+                        <h3 className="font-bold text-secondary">{client.name}</h3>
                         <p className="text-sm text-slate-600">{client.phone}</p>
                         {client.email && (
                           <p className="text-xs text-slate-500">{client.email}</p>
@@ -379,7 +382,7 @@ export function QuoteWizard() {
           {currentStep === 2 && (
             <div className="p-4 space-y-6">
               <div className="text-center mb-6">
-                <h2 className="text-xl font-bold text-navy mb-2">Tipo de Serviço</h2>
+                <h2 className="text-xl font-bold text-secondary mb-2">Tipo de Serviço</h2>
                 <p className="text-slate-600">Selecione o tipo de serviço que será prestado</p>
               </div>
 
@@ -397,7 +400,7 @@ export function QuoteWizard() {
                       <Square className="w-8 h-8 text-blue-600" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-navy mb-2">
+                      <h3 className="text-lg font-bold text-secondary mb-2">
                         Instalação / Vidros
                       </h3>
                       <p className="text-sm text-slate-600">
@@ -428,7 +431,7 @@ export function QuoteWizard() {
                       <Wrench className="w-8 h-8 text-orange-600" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-navy mb-2">
+                      <h3 className="text-lg font-bold text-secondary mb-2">
                         Manutenção / Reparo
                       </h3>
                       <p className="text-sm text-slate-600">
@@ -453,13 +456,18 @@ export function QuoteWizard() {
           {currentStep === 3 && (
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-navy">Itens do Orçamento</h2>
+                <h2 className="text-xl font-bold text-secondary">Itens do Orçamento</h2>
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={() => {
-                    setEditingItemIndex(null);
-                    setShowInstallationModal(true);
+                    if (serviceType === 'installation') {
+                      setEditingItemIndex(null);
+                      setShowTemplateSelector(true);
+                    } else {
+                      setEditingItemIndex(null);
+                      setShowInstallationModal(true);
+                    }
                   }}
                   className="flex items-center gap-2"
                 >
@@ -479,14 +487,14 @@ export function QuoteWizard() {
                     <Card key={index} className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className="font-bold text-navy mb-1">{item.serviceName}</h3>
+                          <h3 className="font-bold text-secondary mb-1">{item.serviceName}</h3>
                           {item.glassColor && (
                             <p className="text-sm text-slate-600">Vidro: {item.glassColor}</p>
                           )}
                           {item.profileColor && (
                             <p className="text-sm text-slate-600">Perfil: {item.profileColor}</p>
                           )}
-                          <p className="text-sm font-medium text-navy mt-2">
+                          <p className="text-sm font-medium text-secondary mt-2">
                             R$ {item.total.toFixed(2)}
                           </p>
                         </div>
@@ -496,7 +504,7 @@ export function QuoteWizard() {
                               setEditingItemIndex(index);
                               setShowInstallationModal(true);
                             }}
-                            className="text-slate-600 hover:text-navy"
+                            className="text-slate-600 hover:text-secondary"
                           >
                             Editar
                           </button>
@@ -519,7 +527,7 @@ export function QuoteWizard() {
           {currentStep === 4 && (
             <div className="p-4 space-y-6">
               <div className="text-center mb-6">
-                <h2 className="text-xl font-bold text-navy mb-2">Resumo do Orçamento</h2>
+                <h2 className="text-xl font-bold text-secondary mb-2">Resumo do Orçamento</h2>
                 {selectedClient && (
                   <p className="text-slate-600">Cliente: {selectedClient.name}</p>
                 )}
@@ -527,7 +535,7 @@ export function QuoteWizard() {
 
               {/* Items Summary */}
               <Card className="p-4">
-                <h3 className="font-bold text-navy mb-3">Itens</h3>
+                <h3 className="font-bold text-secondary mb-3">Itens</h3>
                 <div className="space-y-2 mb-4">
                   {items.map((item, index) => (
                     <div key={index} className="flex justify-between text-sm">
@@ -541,17 +549,17 @@ export function QuoteWizard() {
                     <span>Subtotal:</span>
                     <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full">
+                    <label className="text-sm text-slate-600 whitespace-normal flex-shrink-0">Desconto (R$)</label>
                     <input
                       type="number"
                       value={discount}
                       onChange={(e) => setDiscount(e.target.value)}
-                      placeholder="0,00"
-                      className="flex-1 px-3 py-2 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                      placeholder="Valor (R$)"
+                      className="flex-1 px-3 py-2 text-lg border border-slate-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-navy"
                     />
-                    <span className="text-sm text-slate-600">Desconto (R$)</span>
                   </div>
-                  <div className="flex justify-between text-lg font-bold text-navy pt-2 border-t border-slate-200">
+                  <div className="flex justify-between text-lg font-bold text-secondary pt-2 border-t border-slate-200">
                     <span>Total:</span>
                     <span>R$ {total.toFixed(2)}</span>
                   </div>
@@ -584,7 +592,7 @@ export function QuoteWizard() {
         </div>
 
         {/* Fixed Bottom Navigation */}
-        <div className="border-t border-slate-200 bg-white p-4 flex gap-3">
+        <div className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white p-4 flex gap-3 shadow-lg z-50">
           {currentStep > 1 && (
             <Button
               variant="outline"
@@ -638,15 +646,42 @@ export function QuoteWizard() {
           />
         )}
 
+        {showTemplateSelector && (
+          <TemplateSelector
+            isOpen={showTemplateSelector}
+            onClose={() => {
+              setShowTemplateSelector(false);
+              setSelectedTemplate(null);
+            }}
+            onSelectTemplate={(template) => {
+              setSelectedTemplate(template);
+              setShowTemplateSelector(false);
+              setShowInstallationModal(true);
+            }}
+          />
+        )}
+
         {showInstallationModal && (
           <InstallationItemModal
             isOpen={showInstallationModal}
             onClose={() => {
               setShowInstallationModal(false);
               setEditingItemIndex(null);
+              setSelectedTemplate(null);
             }}
             onSave={handleSaveInstallationItem}
-            initialItem={editingItemIndex !== null ? items[editingItemIndex] : undefined}
+            initialItem={
+              editingItemIndex !== null
+                ? items[editingItemIndex]
+                : selectedTemplate
+                  ? {
+                      serviceName: selectedTemplate.defaultName,
+                      isInstallation: true,
+                      pricingMethod: 'm2',
+                    }
+                  : undefined
+            }
+            isInstallation={serviceType === 'installation'}
           />
         )}
       </div>

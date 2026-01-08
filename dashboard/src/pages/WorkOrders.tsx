@@ -1,11 +1,11 @@
 import { Layout } from '../components/Layout';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { CheckCircle2, Circle, Download, Trash2 } from 'lucide-react';
+import { CheckCircle2, Circle, Download, Trash2, Plus, Search, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { getDocs, doc, getDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
 import { ReceiptPDF } from '../components/ReceiptPDF';
 import { queryWithCompanyId } from '../lib/queries';
@@ -23,18 +23,89 @@ interface WorkOrder {
   notes: string;
 }
 
+interface Client {
+  id: string;
+  name: string;
+  address: string;
+  condominium: string;
+  phone: string;
+  email: string;
+}
+
 export function WorkOrders() {
+  const navigate = useNavigate();
   const { userMetadata } = useAuth();
   const companyId = userMetadata?.companyId;
   const { company } = useCompany();
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showClientSelector, setShowClientSelector] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState('');
 
   useEffect(() => {
     if (companyId) {
       loadWorkOrders();
+      loadClients();
     }
   }, [companyId]);
+
+  const loadClients = async () => {
+    if (!companyId) return;
+    try {
+      const q = queryWithCompanyId('clients', companyId);
+      const snapshot = await getDocs(q);
+      const clientsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Client[];
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  };
+
+  const handleCreateWorkOrder = async () => {
+    if (!selectedClientId || !companyId) {
+      alert('Selecione um cliente');
+      return;
+    }
+
+    const selectedClient = clients.find((c) => c.id === selectedClientId);
+    if (!selectedClient) return;
+
+    try {
+      const workOrderData = {
+        clientId: selectedClientId,
+        clientName: selectedClient.name,
+        clientPhone: selectedClient.phone,
+        clientAddress: selectedClient.address,
+        scheduledDate: new Date().toISOString().split('T')[0],
+        technician: '',
+        status: 'scheduled' as const,
+        checklist: [],
+        notes: '',
+        companyId: companyId,
+        createdAt: new Date(),
+      };
+
+      const docRef = await addDoc(collection(db, 'workOrders'), workOrderData);
+      setShowClientSelector(false);
+      setSelectedClientId('');
+      setClientSearch('');
+      navigate(`/work-orders/${docRef.id}`);
+    } catch (error: any) {
+      console.error('Error creating work order:', error);
+      alert(`Erro ao criar ordem de serviço: ${error.message}`);
+    }
+  };
+
+  const filteredClients = clients.filter((client) =>
+    client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    client.phone.includes(clientSearch) ||
+    client.email.toLowerCase().includes(clientSearch.toLowerCase())
+  );
 
   const loadWorkOrders = async () => {
     if (!companyId) return;
@@ -140,10 +211,93 @@ export function WorkOrders() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-navy">Ordens de Serviço</h1>
-          <p className="text-slate-600 mt-1">Gerencie as ordens de serviço</p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-navy">Ordens de Serviço</h1>
+            <p className="text-slate-600 mt-1">Gerencie as ordens de serviço</p>
+          </div>
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => setShowClientSelector(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Nova OS
+          </Button>
         </div>
+
+        {/* Client Selector Modal */}
+        {showClientSelector && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-navy">Selecione o Cliente</h2>
+                <button onClick={() => {
+                  setShowClientSelector(false);
+                  setSelectedClientId('');
+                  setClientSearch('');
+                }} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    placeholder="Buscar cliente..."
+                    className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    autoFocus
+                  />
+                </div>
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {filteredClients.length === 0 ? (
+                    <p className="text-center text-slate-600 py-4">Nenhum cliente encontrado</p>
+                  ) : (
+                    filteredClients.map((client) => (
+                      <div
+                        key={client.id}
+                        className={`p-3 cursor-pointer transition-all border rounded-lg ${
+                          selectedClientId === client.id
+                            ? 'border-navy bg-navy-50'
+                            : 'border-slate-200 hover:bg-slate-50'
+                        }`}
+                        onClick={() => setSelectedClientId(client.id)}
+                      >
+                        <h3 className="font-bold text-navy">{client.name}</h3>
+                        <p className="text-sm text-slate-600">{client.phone}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowClientSelector(false);
+                      setSelectedClientId('');
+                      setClientSearch('');
+                    }}
+                    className="flex-1"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleCreateWorkOrder}
+                    disabled={!selectedClientId}
+                    className="flex-1"
+                  >
+                    Criar OS
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {loading ? (
           <Card>
