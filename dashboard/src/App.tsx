@@ -22,6 +22,7 @@ import { TechDashboard } from './pages/TechDashboard';
 import { AdminCalendar } from './pages/AdminCalendar';
 import { CompanySettings } from './pages/CompanySettings';
 import { MasterDashboard } from './pages/MasterDashboard';
+import { TemplateManager } from './pages/master/TemplateManager';
 import { SignUp } from './pages/SignUp';
 import { Expired } from './pages/Expired';
 import { RootRedirect } from './components/RootRedirect';
@@ -442,6 +443,14 @@ function AppRoutes() {
         element={
           <MasterRoute>
             <MasterDashboard />
+          </MasterRoute>
+        }
+      />
+      <Route
+        path="/master/templates"
+        element={
+          <MasterRoute>
+            <TemplateManager />
           </MasterRoute>
         }
       />

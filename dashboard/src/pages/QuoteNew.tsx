@@ -4,6 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { Save, Trash2, Download, Plus, FileText } from 'lucide-react';
 import { WhatsAppButton } from '../components/WhatsAppButton';
+import { PDFOptionsModal } from '../components/PDFOptionsModal';
 import { pdf } from '@react-pdf/renderer';
 import { QuotePDF } from '../components/QuotePDF';
 import { ContractModal, ContractData } from '../components/ContractModal';
@@ -139,6 +140,7 @@ export function QuoteNew() {
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
   const [showContractModal, setShowContractModal] = useState(false);
+  const [showPDFOptionsModal, setShowPDFOptionsModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [services, setServices] = useState<Service[]>(DEFAULT_SERVICES);
   const [diagnosis, setDiagnosis] = useState({
@@ -551,12 +553,15 @@ export function QuoteNew() {
     }
   };
 
-  const handleGeneratePDF = async () => {
+  const handleGeneratePDFClick = () => {
     if (!selectedClientId || items.length === 0) {
       alert('Complete o orçamento antes de gerar o PDF');
       return;
     }
+    setShowPDFOptionsModal(true);
+  };
 
+  const handleGeneratePDF = async (options: { hideDimensions: boolean; hideUnitPrice: boolean }) => {
     const selectedClient = clients.find((c) => c.id === selectedClientId);
     if (!selectedClient) return;
 
@@ -585,6 +590,8 @@ export function QuoteNew() {
           observations={observations || undefined}
           photos={diagnosis?.beforePhotos || diagnosis?.afterPhotos || []}
           hasRisk={false}
+          hideDimensions={options.hideDimensions}
+          hideUnitPrice={options.hideUnitPrice}
           companyData={company ? {
             name: company.name,
             address: company.address,
@@ -706,7 +713,7 @@ export function QuoteNew() {
             )}
             <Button
               variant="secondary"
-              onClick={handleGeneratePDF}
+              onClick={handleGeneratePDFClick}
               className="flex items-center gap-2"
               disabled={!selectedClientId || items.length === 0}
             >
@@ -1244,6 +1251,14 @@ export function QuoteNew() {
             }}
             onClose={() => setShowContractModal(false)}
             onGenerate={handleGenerateContract}
+          />
+        )}
+
+        {showPDFOptionsModal && (
+          <PDFOptionsModal
+            isOpen={showPDFOptionsModal}
+            onClose={() => setShowPDFOptionsModal(false)}
+            onConfirm={handleGeneratePDF}
           />
         )}
       </div>

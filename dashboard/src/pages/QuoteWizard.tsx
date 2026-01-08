@@ -5,7 +5,8 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { InstallationItemModal } from '../components/InstallationItemModal';
-import { TemplateSelector } from '../components/TemplateSelector';
+import { TemplateSelectorModal } from '../components/TemplateSelectorModal';
+import { PDFOptionsModal } from '../components/PDFOptionsModal';
 import { ClientForm } from '../components/ClientForm';
 import { Search, Plus, Square, Wrench, ArrowLeft, ArrowRight, Save, Download, X, Trash2 } from 'lucide-react';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
@@ -79,8 +80,9 @@ export function QuoteWizard() {
   
   // UI state
   const [showClientModal, setShowClientModal] = useState(false);
-  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [showTemplateSelectorModal, setShowTemplateSelectorModal] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
+  const [showPDFOptionsModal, setShowPDFOptionsModal] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -190,8 +192,12 @@ export function QuoteWizard() {
     }
   };
 
-  const handleGeneratePDF = async () => {
+  const handleGeneratePDFClick = () => {
     if (!selectedClientId || items.length === 0) return;
+    setShowPDFOptionsModal(true);
+  };
+
+  const handleGeneratePDF = async (options: { hideDimensions: boolean; hideUnitPrice: boolean }) => {
     const selectedClient = clients.find((c) => c.id === selectedClientId);
     if (!selectedClient || !company) return;
 
@@ -216,6 +222,8 @@ export function QuoteWizard() {
           createdAt={new Date()}
           warranty={warranty || undefined}
           observations={observations || undefined}
+          hideDimensions={options.hideDimensions}
+          hideUnitPrice={options.hideUnitPrice}
           companyData={{
             name: company.name,
             address: company.address,
@@ -463,7 +471,7 @@ export function QuoteWizard() {
                   onClick={() => {
                     if (serviceType === 'installation') {
                       setEditingItemIndex(null);
-                      setShowTemplateSelector(true);
+                      setShowTemplateSelectorModal(true);
                     } else {
                       setEditingItemIndex(null);
                       setShowInstallationModal(true);
@@ -617,7 +625,7 @@ export function QuoteWizard() {
             <>
               <Button
                 variant="outline"
-                onClick={handleGeneratePDF}
+                onClick={handleGeneratePDFClick}
                 disabled={!selectedClientId || items.length === 0}
                 className="flex-1 flex items-center justify-center gap-2"
               >
@@ -646,16 +654,19 @@ export function QuoteWizard() {
           />
         )}
 
-        {showTemplateSelector && (
-          <TemplateSelector
-            isOpen={showTemplateSelector}
+        {showTemplateSelectorModal && (
+          <TemplateSelectorModal
+            isOpen={showTemplateSelectorModal}
             onClose={() => {
-              setShowTemplateSelector(false);
-              setSelectedTemplate(null);
+              setShowTemplateSelectorModal(false);
             }}
-            onSelectTemplate={(template) => {
-              setSelectedTemplate(template);
-              setShowTemplateSelector(false);
+            onSelectTemplate={(template: any) => {
+              setSelectedTemplate({
+                serviceName: template.name,
+                isInstallation: true,
+                pricingMethod: 'm2',
+              });
+              setShowTemplateSelectorModal(false);
               setShowInstallationModal(true);
             }}
           />
@@ -675,13 +686,21 @@ export function QuoteWizard() {
                 ? items[editingItemIndex]
                 : selectedTemplate
                   ? {
-                      serviceName: selectedTemplate.defaultName,
+                      serviceName: selectedTemplate.serviceName,
                       isInstallation: true,
                       pricingMethod: 'm2',
                     }
                   : undefined
             }
             isInstallation={serviceType === 'installation'}
+          />
+        )}
+
+        {showPDFOptionsModal && (
+          <PDFOptionsModal
+            isOpen={showPDFOptionsModal}
+            onClose={() => setShowPDFOptionsModal(false)}
+            onConfirm={handleGeneratePDF}
           />
         )}
       </div>

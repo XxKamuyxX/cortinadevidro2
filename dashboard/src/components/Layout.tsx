@@ -16,7 +16,8 @@ import {
   Calendar as CalendarIcon,
   UserCog,
   Building2,
-  Crown
+  Crown,
+  BookOpen
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -44,6 +45,14 @@ export function Layout({ children }: LayoutProps) {
   const isAdmin = userMetadata?.role === 'admin';
   const isMaster = userMetadata?.role === 'master';
   
+  // Master users navigation items
+  const masterNavItems = isMaster
+    ? [
+        { path: '/master', icon: Crown, label: '👑 Gestão SaaS' },
+        { path: '/master/templates', icon: BookOpen, label: '📚 Biblioteca de Projetos' },
+      ]
+    : [];
+
   // Master users only see Gestão SaaS, regular users see standard nav
   const navItems = isMaster 
     ? [] // Master users see no standard nav items
@@ -60,8 +69,6 @@ export function Layout({ children }: LayoutProps) {
         ] : []),
         { path: '/settings', icon: SettingsIcon, label: 'Configurações' },
       ];
-
-  const masterNavItem = isMaster ? { path: '/master', icon: Crown, label: '👑 Gestão SaaS' } : null;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -99,19 +106,23 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
-              {masterNavItem && (
-                <Link
-                  to={masterNavItem.path}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                    isActive(masterNavItem.path)
-                      ? 'bg-gold text-white'
-                      : 'text-gold-700 hover:bg-gold-50'
-                  }`}
-                >
-                  <Crown className="w-5 h-5" />
-                  <span>{masterNavItem.label}</span>
-                </Link>
-              )}
+              {isMaster && masterNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                      isActive(item.path)
+                        ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md shadow-primary/20'
+                        : 'text-slate-700 hover:bg-glass-blue'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
             </nav>
 
             {/* User & Mobile Menu */}
@@ -159,20 +170,24 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
-              {masterNavItem && (
-                <Link
-                  to={masterNavItem.path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    isActive(masterNavItem.path)
-                      ? 'bg-gold text-white'
-                      : 'text-gold-700 hover:bg-gold-50'
-                  }`}
-                >
-                  <Crown className="w-5 h-5" />
-                  <span>{masterNavItem.label}</span>
-                </Link>
-              )}
+              {isMaster && masterNavItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      isActive(item.path)
+                        ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md shadow-primary/20'
+                        : 'text-slate-700 hover:bg-glass-blue'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"

@@ -43,6 +43,8 @@ interface QuotePDFProps {
   companyData?: CompanyData;
   photos?: string[];
   hasRisk?: boolean;
+  hideDimensions?: boolean;
+  hideUnitPrice?: boolean;
 }
 
 const styles = StyleSheet.create({
@@ -269,6 +271,8 @@ export function QuotePDF({
   companyData,
   photos = [],
   hasRisk = false,
+  hideDimensions = false,
+  hideUnitPrice = false,
 }: QuotePDFProps) {
   // Fallback to default values if companyData is not provided
   const company = companyData || {
@@ -349,7 +353,9 @@ export function QuotePDF({
           <View style={styles.tableHeader}>
             <Text style={[styles.tableCell, { flex: 3 }]}>SERVIÇO</Text>
             <Text style={styles.tableCellCenter}>QTD</Text>
-            <Text style={styles.tableCellRight}>PREÇO UNIT.</Text>
+            {!hideUnitPrice && (
+              <Text style={styles.tableCellRight}>PREÇO UNIT.</Text>
+            )}
             <Text style={styles.tableCellRight}>TOTAL</Text>
           </View>
           {items.map((item, index) => {
@@ -358,14 +364,41 @@ export function QuotePDF({
             
             if (item.isInstallation && item.pricingMethod) {
               if (item.pricingMethod === 'm2' && item.dimensions) {
-                const area = item.dimensions.area || (item.dimensions.width * item.dimensions.height);
-                serviceDescription = `${item.serviceName} (${area.toFixed(2)}m²) - ${formatCurrency(item.unitPrice)}/m²`;
+                // Convert mm² to m²: (width_mm * height_mm) / 1000000
+                const area = item.dimensions.area || ((item.dimensions.width * item.dimensions.height) / 1000000);
+                
+                if (hideDimensions) {
+                  // Hide dimensions completely
+                  serviceDescription = item.serviceName;
+                } else {
+                  // Show dimensions (convert mm to m)
+                  const widthM = (item.dimensions.width / 1000).toFixed(2);
+                  const heightM = (item.dimensions.height / 1000).toFixed(2);
+                  serviceDescription = `${item.serviceName} (${widthM}m × ${heightM}m = ${area.toFixed(2)}m²)`;
+                }
+                
+                // Add unit price only if not hiding it
+                if (!hideUnitPrice && !hideDimensions) {
+                  serviceDescription += ` - ${formatCurrency(item.unitPrice)}/m²`;
+                }
+                
                 if (item.quantity > 1) {
                   serviceDescription += ` × ${item.quantity}`;
                 }
               } else if (item.pricingMethod === 'linear' && item.dimensions) {
-                const linearMeters = item.dimensions.width * item.quantity;
-                serviceDescription = `${item.serviceName} (${linearMeters.toFixed(2)}m) - ${formatCurrency(item.unitPrice)}/m linear`;
+                // Convert mm to m
+                const widthM = item.dimensions.width / 1000;
+                const linearMeters = widthM * item.quantity;
+                
+                if (hideDimensions) {
+                  serviceDescription = item.serviceName;
+                } else {
+                  serviceDescription = `${item.serviceName} (${widthM.toFixed(2)}m × ${item.quantity} = ${linearMeters.toFixed(2)}m)`;
+                }
+                
+                if (!hideUnitPrice && !hideDimensions) {
+                  serviceDescription += ` - ${formatCurrency(item.unitPrice)}/m linear`;
+                }
               } else if (item.pricingMethod === 'fixed') {
                 serviceDescription = `${item.serviceName} - ${formatCurrency(item.total)} (Preço Fechado)`;
               }
@@ -381,15 +414,23 @@ export function QuotePDF({
               }
             }
 
+            // Remove any remaining pricing details from description if hideUnitPrice is true
+            if (hideUnitPrice) {
+              serviceDescription = serviceDescription.replace(/\s*-\s*R\$\s*[\d.,]+\/m²/g, '');
+              serviceDescription = serviceDescription.replace(/\s*-\s*R\$\s*[\d.,]+\/m\s*linear/g, '');
+            }
+
             return (
               <View key={index} style={styles.tableRow}>
                 <View style={[styles.tableCell, { flex: 3 }]}>
                   <Text>{serviceDescription}</Text>
                 </View>
                 <Text style={styles.tableCellCenter}>{item.quantity}</Text>
-                <Text style={styles.tableCellRight}>
-                  {item.pricingMethod === 'fixed' ? '-' : formatCurrency(item.unitPrice)}
-                </Text>
+                {!hideUnitPrice && (
+                  <Text style={styles.tableCellRight}>
+                    {item.pricingMethod === 'fixed' ? '-' : formatCurrency(item.unitPrice)}
+                  </Text>
+                )}
                 <Text style={styles.tableCellRight}>{formatCurrency(item.total)}</Text>
               </View>
             );
