@@ -274,30 +274,28 @@ export function CompanySettings() {
 
     setSaving(true);
     try {
-      // Sanitize payload: remove undefined values and convert to empty string or null
-      const cleanData: any = {
-        name: formData.name.trim(),
-        address: formData.address.trim(),
-        phone: formData.phone.trim(),
+      // Sanitize payload: ensure all fields have values (never undefined)
+      // Use JSON.parse(JSON.stringify()) to strip undefined values, then set defaults
+      const rawData: any = {
+        name: formData.name.trim() || '',
+        address: formData.address.trim() || '',
+        phone: formData.phone.trim() || '',
         primaryColor: formData.primaryColor || '#0F172A',
+        cnpj: formData.cnpj?.trim() || '',
+        email: formData.email?.trim() || '',
+        googleReviewUrl: formData.googleReviewUrl?.trim() || '',
       };
 
-      // Optional fields: use empty string instead of undefined
-      if (formData.cnpj && formData.cnpj.trim()) {
-        cleanData.cnpj = formData.cnpj.trim();
-      }
-      if (formData.email && formData.email.trim()) {
-        cleanData.email = formData.email.trim();
-      }
-      if (formData.googleReviewUrl && formData.googleReviewUrl.trim()) {
-        cleanData.googleReviewUrl = formData.googleReviewUrl.trim();
-      }
+      // Only include logoUrl and signatureUrl if they exist
       if (logoUrl) {
-        cleanData.logoUrl = logoUrl;
+        rawData.logoUrl = logoUrl;
       }
       if (signatureUrl) {
-        cleanData.signatureUrl = signatureUrl;
+        rawData.signatureUrl = signatureUrl;
       }
+
+      // Strip undefined values using JSON serialization
+      const cleanData = JSON.parse(JSON.stringify(rawData));
 
       await updateCompany(cleanData);
       alert('Dados da empresa salvos com sucesso!');
@@ -478,48 +476,69 @@ export function CompanySettings() {
 
         <Card>
           <h2 className="text-xl font-bold text-navy mb-4">Informações da Empresa</h2>
-          <div className="space-y-4">
-            <Input
-              label="CNPJ"
-              value={formData.cnpj}
-              onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-              placeholder="00.000.000/0000-00"
-            />
+          
+          {/* Basic Information */}
+          <div className="mb-6 pb-6 border-b border-slate-200">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Informações Básicas *</h3>
+            <div className="space-y-4">
+              <Input
+                label="Nome da Empresa *"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Nome da sua empresa"
+                required
+              />
 
-            <Input
-              label="Endereço Completo *"
-              value={formData.address}
-              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              placeholder="Rua, número, bairro, cidade - UF"
-              required
-            />
+              <Input
+                label="Endereço Completo *"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                placeholder="Rua, número, bairro, cidade - UF"
+                required
+              />
 
-            <Input
-              label="Telefone/WhatsApp *"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="(31) 99999-9999"
-              required
-            />
+              <Input
+                label="Telefone/WhatsApp *"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="(31) 99999-9999"
+                required
+              />
+            </div>
+          </div>
 
-            <Input
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="contato@empresa.com.br"
-            />
+          {/* Advanced Information */}
+          <div>
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Informações Avançadas</h3>
+            <div className="space-y-4">
+              <Input
+                label="CNPJ"
+                value={formData.cnpj}
+                onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
+                placeholder="00.000.000/0000-00"
+              />
 
-            <Input
-              label="Link de Avaliação Google"
-              type="url"
-              value={formData.googleReviewUrl}
-              onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
-              placeholder="https://g.page/r/..."
-            />
-            <p className="text-xs text-slate-500">
-              Link do Google Maps para avaliações. Será incluído nas mensagens do WhatsApp.
-            </p>
+              <Input
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="contato@empresa.com.br"
+              />
+
+              <div>
+                <Input
+                  label="Link de Avaliação Google"
+                  type="url"
+                  value={formData.googleReviewUrl}
+                  onChange={(e) => setFormData({ ...formData, googleReviewUrl: e.target.value })}
+                  placeholder="https://g.page/r/..."
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Cole aqui o link que você manda para o cliente te avaliar. Este link será incluído automaticamente nas mensagens do WhatsApp quando você enviar orçamentos e recibos.
+                </p>
+              </div>
+            </div>
           </div>
         </Card>
 
@@ -715,9 +734,11 @@ export function CompanySettings() {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={serviceForm.defaultPrice}
+                    value={serviceForm.defaultPrice === 0 ? '' : serviceForm.defaultPrice.toString()}
                     onChange={(e) => setServiceForm({ ...serviceForm, defaultPrice: parseFloat(e.target.value) || 0 })}
+                    placeholder="Ex: 150,00"
                     required
+                    className="text-lg"
                   />
                   
                   <div>

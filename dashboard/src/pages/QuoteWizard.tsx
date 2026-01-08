@@ -1,0 +1,638 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Layout } from '../components/Layout';
+import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
+import { InstallationItemModal } from '../components/InstallationItemModal';
+import { ClientForm } from '../components/ClientForm';
+import { Search, Plus, Square, Wrench, ArrowLeft, ArrowRight, Save, Download, X, Trash2 } from 'lucide-react';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { queryWithCompanyId } from '../lib/queries';
+import { useAuth } from '../contexts/AuthContext';
+import { useCompany } from '../hooks/useCompany';
+import { pdf } from '@react-pdf/renderer';
+import { QuotePDF } from '../components/QuotePDF';
+
+interface Client {
+  id: string;
+  name: string;
+  address: string;
+  condominium: string;
+  phone: string;
+  email: string;
+}
+
+interface QuoteItem {
+  serviceId: string;
+  serviceName: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+  isCustom?: boolean;
+  pricingMethod?: 'm2' | 'linear' | 'fixed' | 'unit';
+  dimensions?: {
+    width: number;
+    height: number;
+    area?: number;
+  };
+  glassColor?: string;
+  glassThickness?: string;
+  profileColor?: string;
+  isInstallation?: boolean;
+}
+
+type ServiceType = 'installation' | 'maintenance' | null;
+
+const VIP_CONDOMINIUMS = [
+  'Belvedere',
+  'Vila da Serra',
+  'Nova Lima',
+  'Alphaville Lagoa dos Ingleses',
+  'Vale dos Cristais',
+  'Olympus',
+  'Four Seasons',
+  'Beverly Hills',
+];
+
+export function QuoteWizard() {
+  const navigate = useNavigate();
+  const { userMetadata } = useAuth();
+  const companyId = userMetadata?.companyId;
+  const { company } = useCompany();
+  
+  // Wizard state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [clientSearch, setClientSearch] = useState('');
+  
+  // Data state
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [serviceType, setServiceType] = useState<ServiceType>(null);
+  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [discount, setDiscount] = useState('');
+  const [warranty, setWarranty] = useState('');
+  const [observations, setObservations] = useState('');
+  
+  // UI state
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showInstallationModal, setShowInstallationModal] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (companyId) {
+      loadClients();
+      setLoading(false);
+    }
+  }, [companyId]);
+
+  const loadClients = async () => {
+    if (!companyId) return;
+    try {
+      const q = queryWithCompanyId('clients', companyId);
+      const snapshot = await getDocs(q);
+      const clientsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Client[];
+      setClients(clientsData);
+    } catch (error) {
+      console.error('Error loading clients:', error);
+    }
+  };
+
+  const handleCreateClient = async (clientData: Omit<Client, 'id'>) => {
+    if (!companyId) {
+      alert('Erro: Empresa não identificada.');
+      return;
+    }
+    try {
+      const newClientData = {
+        ...clientData,
+        companyId: companyId,
+        createdAt: new Date(),
+      };
+      const docRef = await addDoc(collection(db, 'clients'), newClientData);
+      await loadClients();
+      setSelectedClientId(docRef.id);
+      setShowClientModal(false);
+    } catch (error: any) {
+      console.error('Error creating client:', error);
+      alert(`Erro ao criar cliente: ${error.message}`);
+    }
+  };
+
+  const handleSaveInstallationItem = (itemData: any) => {
+    if (editingItemIndex !== null) {
+      const newItems = [...items];
+      newItems[editingItemIndex] = {
+        ...newItems[editingItemIndex],
+        ...itemData,
+        serviceId: newItems[editingItemIndex].serviceId || `installation-${Date.now()}`,
+      };
+      setItems(newItems);
+      setEditingItemIndex(null);
+    } else {
+      const newItem: QuoteItem = {
+        ...itemData,
+        serviceId: `installation-${Date.now()}`,
+      };
+      setItems([...items, newItem]);
+    }
+    setShowInstallationModal(false);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    const newItems = items.filter((_, i) => i !== index);
+    setItems(newItems);
+  };
+
+  const handleSave = async () => {
+    if (!companyId || !selectedClientId || items.length === 0) {
+      alert('Complete todos os campos obrigatórios');
+      return;
+    }
+
+    try {
+      const quoteData = {
+        clientId: selectedClientId,
+        items,
+        subtotal: items.reduce((sum, item) => sum + item.total, 0),
+        discount: parseFloat(discount) || 0,
+        total: items.reduce((sum, item) => sum + item.total, 0) - (parseFloat(discount) || 0),
+        status: 'draft',
+        warranty: warranty || '',
+        observations: observations || '',
+        companyId,
+        createdAt: new Date(),
+      };
+
+      await addDoc(collection(db, 'quotes'), quoteData);
+      alert('Orçamento salvo com sucesso!');
+      navigate('/quotes');
+    } catch (error: any) {
+      console.error('Error saving quote:', error);
+      alert(`Erro ao salvar orçamento: ${error.message}`);
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    if (!selectedClientId || items.length === 0) return;
+    const selectedClient = clients.find((c) => c.id === selectedClientId);
+    if (!selectedClient || !company) return;
+
+    try {
+      let logoBase64: string | null = null;
+      if (company.logoUrl) {
+        const { getBase64ImageFromUrl } = await import('../utils/imageToBase64');
+        logoBase64 = await getBase64ImageFromUrl(company.logoUrl);
+      }
+
+      const doc = (
+        <QuotePDF
+          clientName={selectedClient.name}
+          clientAddress={selectedClient.address}
+          clientCondominium={selectedClient.condominium}
+          clientPhone={selectedClient.phone}
+          clientEmail={selectedClient.email}
+          items={items}
+          subtotal={items.reduce((sum, item) => sum + item.total, 0)}
+          discount={parseFloat(discount) || 0}
+          total={items.reduce((sum, item) => sum + item.total, 0) - (parseFloat(discount) || 0)}
+          createdAt={new Date()}
+          warranty={warranty || undefined}
+          observations={observations || undefined}
+          companyData={{
+            name: company.name,
+            address: company.address,
+            phone: company.phone,
+            email: company.email || '',
+            logoUrl: logoBase64 || company.logoUrl || undefined,
+            cnpj: company.cnpj || '',
+          }}
+        />
+      );
+
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Orcamento_${selectedClient.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erro ao gerar PDF');
+    }
+  };
+
+  const filteredClients = clients.filter((client) =>
+    client.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    client.phone.includes(clientSearch) ||
+    client.email.toLowerCase().includes(clientSearch.toLowerCase())
+  );
+
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const discountValue = parseFloat(discount) || 0;
+  const total = subtotal - discountValue;
+
+  // Step validation
+  const canGoNext = () => {
+    switch (currentStep) {
+      case 1:
+        return !!selectedClientId;
+      case 2:
+        return serviceType !== null;
+      case 3:
+        return items.length > 0;
+      case 4:
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-screen">
+          <p className="text-slate-600">Carregando...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      <div className="h-screen flex flex-col">
+        {/* Progress Indicator */}
+        <div className="px-4 pt-4 pb-2 border-b border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => navigate('/quotes')}
+              className="text-slate-600 hover:text-navy"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-bold text-navy">Novo Orçamento</h1>
+            <div className="w-5" />
+          </div>
+          <div className="flex gap-2 mt-3">
+            {[1, 2, 3, 4].map((step) => (
+              <div
+                key={step}
+                className={`flex-1 h-1 rounded-full ${
+                  step <= currentStep ? 'bg-navy' : 'bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-slate-600 mt-2 text-center">
+            {currentStep === 1 && 'Cliente'}
+            {currentStep === 2 && 'Tipo de Serviço'}
+            {currentStep === 3 && 'Itens'}
+            {currentStep === 4 && 'Resumo'}
+          </p>
+        </div>
+
+        {/* Step Content - Takes remaining space */}
+        <div className="flex-1 overflow-y-auto">
+          {/* STEP 1: CLIENT SELECTION */}
+          {currentStep === 1 && (
+            <div className="p-4 space-y-4">
+              <div>
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                    placeholder="Buscar cliente por nome, telefone ou email..."
+                    className="w-full pl-10 pr-4 py-3 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    autoFocus
+                  />
+                </div>
+
+                {filteredClients.length === 0 ? (
+                  <Card className="p-8 text-center">
+                    <p className="text-slate-600 mb-4">
+                      {clientSearch ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                    </p>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {filteredClients.map((client) => (
+                      <div
+                        key={client.id}
+                        className={`p-4 cursor-pointer transition-all border border-slate-200 rounded-lg bg-white ${
+                          selectedClientId === client.id
+                            ? 'border-2 border-navy bg-navy-50'
+                            : 'hover:bg-slate-50'
+                        }`}
+                        onClick={() => setSelectedClientId(client.id)}
+                      >
+                        <h3 className="font-bold text-navy">{client.name}</h3>
+                        <p className="text-sm text-slate-600">{client.phone}</p>
+                        {client.email && (
+                          <p className="text-xs text-slate-500">{client.email}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShowClientModal(true)}
+                  className="w-full mt-4 flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Novo Cliente
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: SERVICE TYPE */}
+          {currentStep === 2 && (
+            <div className="p-4 space-y-6">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-navy mb-2">Tipo de Serviço</h2>
+                <p className="text-slate-600">Selecione o tipo de serviço que será prestado</p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div
+                  className={`p-6 cursor-pointer transition-all border-2 rounded-lg ${
+                    serviceType === 'installation'
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-slate-200 hover:border-blue-300 bg-white'
+                  }`}
+                  onClick={() => setServiceType('installation')}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <Square className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-navy mb-2">
+                        Instalação / Vidros
+                      </h3>
+                      <p className="text-sm text-slate-600">
+                        Cortinas de vidro, box, guarda-corpos, portas e janelas
+                      </p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Inclui campos para dimensões, cor do vidro e perfil
+                      </p>
+                    </div>
+                    {serviceType === 'installation' && (
+                      <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className={`p-6 cursor-pointer transition-all border-2 rounded-lg ${
+                    serviceType === 'maintenance'
+                      ? 'border-orange-500 bg-orange-50'
+                      : 'border-slate-200 hover:border-orange-300 bg-white'
+                  }`}
+                  onClick={() => setServiceType('maintenance')}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-orange-100 rounded-lg">
+                      <Wrench className="w-8 h-8 text-orange-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-navy mb-2">
+                        Manutenção / Reparo
+                      </h3>
+                      <p className="text-sm text-slate-600">
+                        Troca de peças, manutenção, reparos e serviços gerais
+                      </p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Sem dimensões, foco em peças e mão de obra
+                      </p>
+                    </div>
+                    {serviceType === 'maintenance' && (
+                      <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-white font-bold">
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: ITEMS */}
+          {currentStep === 3 && (
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-navy">Itens do Orçamento</h2>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    setEditingItemIndex(null);
+                    setShowInstallationModal(true);
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar Item
+                </Button>
+              </div>
+
+              {items.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <p className="text-slate-600 mb-4">Nenhum item adicionado ainda</p>
+                  <p className="text-sm text-slate-500">Clique em "Adicionar Item" para começar</p>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {items.map((item, index) => (
+                    <Card key={index} className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-navy mb-1">{item.serviceName}</h3>
+                          {item.glassColor && (
+                            <p className="text-sm text-slate-600">Vidro: {item.glassColor}</p>
+                          )}
+                          {item.profileColor && (
+                            <p className="text-sm text-slate-600">Perfil: {item.profileColor}</p>
+                          )}
+                          <p className="text-sm font-medium text-navy mt-2">
+                            R$ {item.total.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingItemIndex(index);
+                              setShowInstallationModal(true);
+                            }}
+                            className="text-slate-600 hover:text-navy"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleRemoveItem(index)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 4: SUMMARY */}
+          {currentStep === 4 && (
+            <div className="p-4 space-y-6">
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold text-navy mb-2">Resumo do Orçamento</h2>
+                {selectedClient && (
+                  <p className="text-slate-600">Cliente: {selectedClient.name}</p>
+                )}
+              </div>
+
+              {/* Items Summary */}
+              <Card className="p-4">
+                <h3 className="font-bold text-navy mb-3">Itens</h3>
+                <div className="space-y-2 mb-4">
+                  {items.map((item, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span>{item.serviceName}</span>
+                      <span className="font-medium">R$ {item.total.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 pt-3 space-y-2">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={discount}
+                      onChange={(e) => setDiscount(e.target.value)}
+                      placeholder="0,00"
+                      className="flex-1 px-3 py-2 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    />
+                    <span className="text-sm text-slate-600">Desconto (R$)</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-navy pt-2 border-t border-slate-200">
+                    <span>Total:</span>
+                    <span>R$ {total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Optional Fields */}
+              <Card className="p-4 space-y-4">
+                <Input
+                  label="Garantia"
+                  value={warranty}
+                  onChange={(e) => setWarranty(e.target.value)}
+                  placeholder="Ex: 90 dias"
+                />
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Observações
+                  </label>
+                  <textarea
+                    value={observations}
+                    onChange={(e) => setObservations(e.target.value)}
+                    placeholder="Observações adicionais..."
+                    rows={3}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy resize-none"
+                  />
+                </div>
+              </Card>
+            </div>
+          )}
+        </div>
+
+        {/* Fixed Bottom Navigation */}
+        <div className="border-t border-slate-200 bg-white p-4 flex gap-3">
+          {currentStep > 1 && (
+            <Button
+              variant="outline"
+              onClick={() => setCurrentStep(currentStep - 1)}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Voltar
+            </Button>
+          )}
+          {currentStep < 4 ? (
+            <Button
+              variant="primary"
+              onClick={() => setCurrentStep(currentStep + 1)}
+              disabled={!canGoNext()}
+              className="flex-1 flex items-center justify-center gap-2"
+            >
+              Próximo
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleGeneratePDF}
+                disabled={!selectedClientId || items.length === 0}
+                className="flex-1 flex items-center justify-center gap-2"
+              >
+                <Download className="w-5 h-5" />
+                PDF
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSave}
+                disabled={!selectedClientId || items.length === 0}
+                className="flex-1 flex items-center justify-center gap-2"
+              >
+                <Save className="w-5 h-5" />
+                Salvar
+              </Button>
+            </>
+          )}
+        </div>
+
+        {/* Modals */}
+        {showClientModal && (
+          <ClientForm
+            onSave={handleCreateClient}
+            onCancel={() => setShowClientModal(false)}
+            vipCondominiums={VIP_CONDOMINIUMS}
+          />
+        )}
+
+        {showInstallationModal && (
+          <InstallationItemModal
+            isOpen={showInstallationModal}
+            onClose={() => {
+              setShowInstallationModal(false);
+              setEditingItemIndex(null);
+            }}
+            onSave={handleSaveInstallationItem}
+            initialItem={editingItemIndex !== null ? items[editingItemIndex] : undefined}
+          />
+        )}
+      </div>
+    </Layout>
+  );
+}

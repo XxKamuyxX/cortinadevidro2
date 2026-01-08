@@ -7,6 +7,7 @@ import { Clients } from './pages/Clients';
 import { ClientNew } from './pages/ClientNew';
 import { Quotes } from './pages/Quotes';
 import { QuoteNew } from './pages/QuoteNew';
+import { QuoteWizard } from './pages/QuoteWizard';
 import { WorkOrders } from './pages/WorkOrders';
 import { Finance } from './pages/Finance';
 import { Settings } from './pages/Settings';
@@ -274,7 +275,7 @@ function AppRoutes() {
         path="/admin/quotes/new"
         element={
           <AdminRoute>
-            <QuoteNew />
+            <QuoteWizard />
           </AdminRoute>
         }
       />
@@ -364,7 +365,7 @@ function AppRoutes() {
         path="/quotes/new"
         element={
           <PrivateRoute>
-            <Navigate to="/admin/quotes/new" replace />
+            <QuoteWizard />
           </PrivateRoute>
         }
       />

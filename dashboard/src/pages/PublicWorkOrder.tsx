@@ -104,18 +104,27 @@ export function PublicWorkOrder() {
     try {
       // Load company data if companyId exists
       let companyData = undefined;
+      let logoBase64: string | null = null;
+      
       if (workOrder.companyId || (quote as any).companyId) {
         const companyId = workOrder.companyId || (quote as any).companyId;
         const companyDocRef = doc(db, 'companies', companyId);
         const companyDoc = await getDoc(companyDocRef);
         if (companyDoc.exists()) {
           const company = companyDoc.data();
+          
+          // Convert logo to base64 to avoid CORS issues
+          if (company.logoUrl) {
+            const { getBase64ImageFromUrl } = await import('../utils/imageToBase64');
+            logoBase64 = await getBase64ImageFromUrl(company.logoUrl as string);
+          }
+          
           companyData = {
             name: company.name as string,
             address: company.address as string,
             phone: company.phone as string,
             email: company.email as string | undefined,
-            logoUrl: company.logoUrl as string | undefined,
+            logoUrl: logoBase64 || (company.logoUrl as string | undefined),
             cnpj: company.cnpj as string | undefined,
           };
         }

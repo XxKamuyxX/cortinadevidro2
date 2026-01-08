@@ -77,6 +77,13 @@ export function WorkOrders() {
         }
       }
 
+      // Convert logo to base64 to avoid CORS issues
+      let logoBase64: string | null = null;
+      if (company?.logoUrl) {
+        const { getBase64ImageFromUrl } = await import('../utils/imageToBase64');
+        logoBase64 = await getBase64ImageFromUrl(company.logoUrl);
+      }
+
       const receiptDoc = (
         <ReceiptPDF
           clientName={order.clientName}
@@ -93,9 +100,9 @@ export function WorkOrders() {
             name: company.name,
             address: company.address,
             phone: company.phone,
-            email: company.email,
-            logoUrl: company.logoUrl,
-            cnpj: company.cnpj,
+            email: company.email || '',
+            logoUrl: logoBase64 || company.logoUrl || undefined,
+            cnpj: company.cnpj || '',
           } : undefined}
         />
       );

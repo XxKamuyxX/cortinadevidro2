@@ -134,7 +134,7 @@ export function QuoteNew() {
   const [warranty, setWarranty] = useState('');
   const [observations, setObservations] = useState('');
   const [customServiceName, setCustomServiceName] = useState('');
-  const [customServicePrice, setCustomServicePrice] = useState(0);
+  const [customServicePrice, setCustomServicePrice] = useState('');
   const [showCustomService, setShowCustomService] = useState(false);
   const [showInstallationModal, setShowInstallationModal] = useState(false);
   const [showClientModal, setShowClientModal] = useState(false);
@@ -213,6 +213,9 @@ export function QuoteNew() {
   };
 
   const addService = (service: Service) => {
+    // If service type is 'meter', use m2 pricing with dimensions
+    const isMeterService = service.type === 'meter';
+    
     const newItem: QuoteItem = {
       serviceId: service.id,
       serviceName: service.name,
@@ -220,12 +223,22 @@ export function QuoteNew() {
       unitPrice: service.defaultPrice || 0,
       total: service.defaultPrice || 0,
       isCustom: false,
+      // For meter services, set pricing method and dimensions
+      ...(isMeterService && {
+        pricingMethod: 'm2' as const,
+        dimensions: {
+          width: 0,
+          height: 0,
+          area: 0,
+        },
+      }),
     };
     setItems([...items, newItem]);
   };
 
   const addCustomService = () => {
-    if (!customServiceName || customServicePrice <= 0) {
+    const price = parseFloat(customServicePrice) || 0;
+    if (!customServiceName || price <= 0) {
       alert('Preencha o nome e o preço do serviço');
       return;
     }
@@ -233,19 +246,24 @@ export function QuoteNew() {
       serviceId: `custom-${Date.now()}`,
       serviceName: customServiceName,
       quantity: 1,
-      unitPrice: customServicePrice,
-      total: customServicePrice,
+      unitPrice: price,
+      total: price,
       isCustom: true,
     };
     setItems([...items, newItem]);
     setCustomServiceName('');
-    setCustomServicePrice(0);
+    setCustomServicePrice('');
     setShowCustomService(false);
   };
 
   const updateItem = (index: number, field: 'quantity' | 'unitPrice', value: number) => {
     const newItems = [...items];
     const item = newItems[index];
+    
+    // Don't allow editing unitPrice for catalog services (not custom)
+    if (field === 'unitPrice' && !item.isCustom) {
+      return; // Catalog service price is read-only
+    }
     
     // If item has pricing method, recalculate based on method
     if (item.pricingMethod && item.pricingMethod !== 'fixed' && !item.isInstallation) {
@@ -259,7 +277,8 @@ export function QuoteNew() {
         } else {
           item.total = item.quantity * item.unitPrice;
         }
-      } else if (field === 'unitPrice') {
+      } else if (field === 'unitPrice' && item.isCustom) {
+        // Only allow editing unitPrice for custom services
         item.unitPrice = value;
         if (item.pricingMethod === 'm2' && item.dimensions) {
           const area = item.dimensions.width * item.dimensions.height;
@@ -275,7 +294,8 @@ export function QuoteNew() {
       if (field === 'quantity') {
         item.quantity = value;
         item.total = item.quantity * item.unitPrice;
-      } else if (field === 'unitPrice') {
+      } else if (field === 'unitPrice' && item.isCustom) {
+        // Only allow editing unitPrice for custom services
         item.unitPrice = value;
         item.total = item.quantity * item.unitPrice;
       }
@@ -499,6 +519,13 @@ export function QuoteNew() {
     if (!selectedClient) return;
 
     try {
+      // Convert logo to base64 to avoid CORS issues
+      let logoBase64: string | null = null;
+      if (company?.logoUrl) {
+        const { getBase64ImageFromUrl } = await import('../utils/imageToBase64');
+        logoBase64 = await getBase64ImageFromUrl(company.logoUrl);
+      }
+
       const doc = (
         <QuotePDF
           clientName={selectedClient.name}
@@ -520,9 +547,9 @@ export function QuoteNew() {
             name: company.name,
             address: company.address,
             phone: company.phone,
-            email: company.email,
-            logoUrl: company.logoUrl,
-            cnpj: company.cnpj,
+            email: company.email || '',
+            logoUrl: logoBase64 || company.logoUrl || undefined,
+            cnpj: company.cnpj || '',
           } : undefined}
         />
       );
@@ -552,6 +579,13 @@ export function QuoteNew() {
     if (!selectedClient) return;
 
     try {
+      // Convert logo to base64 to avoid CORS issues
+      let logoBase64: string | null = null;
+      if (company?.logoUrl) {
+        const { getBase64ImageFromUrl } = await import('../utils/imageToBase64');
+        logoBase64 = await getBase64ImageFromUrl(company.logoUrl);
+      }
+
       // Prepare quote items for contract
       const contractItems = items.map(item => ({
         serviceName: item.serviceName,
@@ -569,9 +603,9 @@ export function QuoteNew() {
             name: company.name,
             address: company.address,
             phone: company.phone,
-            email: company.email,
-            logoUrl: company.logoUrl,
-            cnpj: company.cnpj,
+            email: company.email || '',
+            logoUrl: logoBase64 || company.logoUrl || undefined,
+            cnpj: company.cnpj || '',
           } : undefined}
         />
       );
@@ -740,12 +774,12 @@ export function QuoteNew() {
                       <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="number"
-                          placeholder="Preço unitário (R$)"
                           min="0"
                           step="0.01"
                           value={customServicePrice}
-                          onChange={(e) => setCustomServicePrice(parseFloat(e.target.value) || 0)}
-                          className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                          onChange={(e) => setCustomServicePrice(e.target.value)}
+                          placeholder="Ex: 150,00"
+                          className="flex-1 px-3 py-2 text-lg border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                         />
                         <Button 
                           variant="primary" 
@@ -857,43 +891,170 @@ export function QuoteNew() {
                         </div>
 
                         {!item.isInstallation ? (
-                          <div className="grid grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-xs text-slate-600 mb-1">
-                                Quantidade
-                              </label>
-                              <input
-                                type="number"
-                                min="1"
-                                step="1"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  updateItem(index, 'quantity', parseFloat(e.target.value) || 1)
-                                }
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-slate-600 mb-1">
-                                Preço / Unidade
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.unitPrice}
-                                onChange={(e) =>
-                                  updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)
-                                }
-                                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-slate-600 mb-1">Total</label>
-                              <div className="px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium text-navy">
-                                R$ {item.total.toFixed(2)}
+                          <div>
+                            {/* For m2 services (from catalog with type='meter'), show dimensions */}
+                            {item.pricingMethod === 'm2' ? (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-xs text-slate-600 mb-1">
+                                      Largura (m) *
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.dimensions?.width || 0}
+                                      onChange={(e) => {
+                                        const width = parseFloat(e.target.value) || 0;
+                                        const newItems = [...items];
+                                        newItems[index].dimensions = {
+                                          ...newItems[index].dimensions,
+                                          width,
+                                          height: newItems[index].dimensions?.height || 0,
+                                          area: width * (newItems[index].dimensions?.height || 0),
+                                        };
+                                        // Recalculate total
+                                        if (width > 0 && (newItems[index].dimensions?.height || 0) > 0) {
+                                          const area = width * (newItems[index].dimensions?.height || 0);
+                                          newItems[index].total = area * newItems[index].quantity * newItems[index].unitPrice;
+                                        }
+                                        setItems(newItems);
+                                      }}
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                                      required
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-slate-600 mb-1">
+                                      Altura (m) *
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.dimensions?.height || 0}
+                                      onChange={(e) => {
+                                        const height = parseFloat(e.target.value) || 0;
+                                        const newItems = [...items];
+                                        newItems[index].dimensions = {
+                                          ...newItems[index].dimensions,
+                                          width: newItems[index].dimensions?.width || 0,
+                                          height,
+                                          area: (newItems[index].dimensions?.width || 0) * height,
+                                        };
+                                        // Recalculate total
+                                        if ((newItems[index].dimensions?.width || 0) > 0 && height > 0) {
+                                          const area = (newItems[index].dimensions?.width || 0) * height;
+                                          newItems[index].total = area * newItems[index].quantity * newItems[index].unitPrice;
+                                        }
+                                        setItems(newItems);
+                                      }}
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                                      required
+                                    />
+                                  </div>
+                                </div>
+                                {item.dimensions?.width && item.dimensions?.height && item.dimensions.width > 0 && item.dimensions.height > 0 && (
+                                  <div className="p-2 bg-blue-50 rounded-lg border border-blue-200">
+                                    <p className="text-xs text-blue-700">
+                                      <span className="font-medium">Área:</span> {(item.dimensions.width * item.dimensions.height).toFixed(2)} m²
+                                      {item.quantity > 1 && (
+                                        <span className="ml-2">
+                                          ({item.quantity}x = {((item.dimensions.width * item.dimensions.height) * item.quantity).toFixed(2)} m² total)
+                                        </span>
+                                      )}
+                                    </p>
+                                  </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-xs text-slate-600 mb-1">
+                                      Quantidade
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={item.quantity}
+                                      onChange={(e) => {
+                                        const quantity = parseFloat(e.target.value) || 1;
+                                        const newItems = [...items];
+                                        newItems[index].quantity = quantity;
+                                        // Recalculate total
+                                        if (newItems[index].dimensions?.width && newItems[index].dimensions?.height) {
+                                          const area = newItems[index].dimensions.width * newItems[index].dimensions.height;
+                                          newItems[index].total = area * quantity * newItems[index].unitPrice;
+                                        }
+                                        setItems(newItems);
+                                      }}
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-slate-600 mb-1">Total</label>
+                                    <div className="px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium text-navy">
+                                      R$ {item.total.toFixed(2)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-xs text-slate-500">
+                                  Preço: R$ {item.unitPrice.toFixed(2)}/m² (do catálogo)
+                                </div>
                               </div>
-                            </div>
+                            ) : (
+                              <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                  <label className="block text-xs text-slate-600 mb-1">
+                                    Quantidade
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    value={item.quantity}
+                                    onChange={(e) =>
+                                      updateItem(index, 'quantity', parseFloat(e.target.value) || 1)
+                                    }
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                                  />
+                                </div>
+                                {/* Hide unit price if service is from catalog (not custom) */}
+                                {item.isCustom ? (
+                                  <div>
+                                    <label className="block text-xs text-slate-600 mb-1">
+                                      Preço / Unidade
+                                    </label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.unitPrice}
+                                      onChange={(e) =>
+                                        updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)
+                                      }
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <label className="block text-xs text-slate-600 mb-1">
+                                      Preço / Unidade
+                                    </label>
+                                    <div className="px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-600 text-sm">
+                                      R$ {item.unitPrice.toFixed(2)}
+                                      <span className="text-xs text-slate-500 block">(do catálogo)</span>
+                                    </div>
+                                  </div>
+                                )}
+                                <div>
+                                  <label className="block text-xs text-slate-600 mb-1">Total</label>
+                                  <div className="px-3 py-2 bg-white border border-slate-300 rounded-lg font-medium text-navy">
+                                    R$ {item.total.toFixed(2)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="p-3 bg-white rounded-lg border border-slate-200">

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { X } from 'lucide-react';
+import { X, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -22,6 +22,7 @@ interface ClientFormProps {
 }
 
 export function ClientForm({ client, onSave, onCancel, vipCondominiums }: ClientFormProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -69,30 +70,6 @@ export function ClientForm({ client, onSave, onCancel, vipCondominiums }: Client
             required
           />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Condomínio
-            </label>
-            <input
-              type="text"
-              list="condominiums"
-              value={formData.condominium}
-              onChange={(e) => setFormData({ ...formData, condominium: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
-            />
-            <datalist id="condominiums">
-              {vipCondominiums.map((condo) => (
-                <option key={condo} value={condo} />
-              ))}
-            </datalist>
-          </div>
-
-          <Input
-            label="Endereço Completo"
-            value={formData.address}
-            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-          />
-
           <Input
             label="Telefone"
             type="tel"
@@ -102,11 +79,57 @@ export function ClientForm({ client, onSave, onCancel, vipCondominiums }: Client
           />
 
           <Input
-            label="Email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            label="Endereço (Rua e Número)"
+            value={formData.address}
+            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            placeholder="Ex: Rua das Flores, 123"
           />
+
+          {/* Advanced Fields Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-sm text-slate-600 hover:text-navy transition-colors w-full justify-between p-2 rounded-lg hover:bg-slate-50"
+          >
+            <span className="font-medium">Mais Detalhes</span>
+            {showAdvanced ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+
+          {/* Advanced Fields */}
+          {showAdvanced && (
+            <div className="space-y-4 pt-2 border-t border-slate-200">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Condomínio
+                </label>
+                <input
+                  type="text"
+                  list="condominiums"
+                  value={formData.condominium}
+                  onChange={(e) => setFormData({ ...formData, condominium: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  placeholder="Nome do condomínio (opcional)"
+                />
+                <datalist id="condominiums">
+                  {vipCondominiums.map((condo) => (
+                    <option key={condo} value={condo} />
+                  ))}
+                </datalist>
+              </div>
+
+              <Input
+                label="Email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="email@exemplo.com (opcional)"
+              />
+            </div>
+          )}
 
           <div className="flex gap-4 pt-4">
             <Button type="submit" variant="primary" className="flex-1">
