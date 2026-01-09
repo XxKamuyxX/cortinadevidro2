@@ -1,17 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { useCompany } from '../hooks/useCompany';
+import { getSegmentConfig } from '../config/segments';
+import * as LucideIcons from 'lucide-react';
 import { 
-  AppWindow, 
-  DoorOpen, 
-  Bath, 
-  Shield, 
-  Blinds, 
-  Frame, 
-  Square, 
-  Plus, 
   ArrowLeft,
   X,
   Check
@@ -39,94 +33,132 @@ export interface QuoteItem {
   profileColor?: string;
 }
 
-type Category = 'janelas' | 'portas' | 'box' | 'guarda-corpo' | 'envidracamento' | 'espelhos' | 'fixos' | 'outros';
+// Helper function to get icon component by name
+const getIconComponent = (iconName: string, className: string = "w-8 h-8") => {
+  const IconComponent = (LucideIcons as any)[iconName];
+  if (IconComponent) {
+    return <IconComponent className={className} />;
+  }
+  // Fallback to Plus icon if not found
+  const PlusIcon = LucideIcons.Plus;
+  return <PlusIcon className={className} />;
+};
 
-interface CategoryConfig {
-  id: Category;
-  name: string;
-  icon: React.ReactNode;
-  models: { id: string; name: string }[];
-}
-
-const CATEGORIES: CategoryConfig[] = [
-  {
-    id: 'janelas',
-    name: 'Janelas',
-    icon: <AppWindow className="w-8 h-8" />,
-    models: [
-      { id: '2-folhas-correr', name: '2 Folhas Correr' },
-      { id: '4-folhas-correr', name: '4 Folhas Correr' },
-      { id: 'basculante', name: 'Basculante' },
-      { id: 'maxim-ar', name: 'Maxim-ar' },
-    ],
-  },
-  {
-    id: 'portas',
-    name: 'Portas',
-    icon: <DoorOpen className="w-8 h-8" />,
-    models: [
-      { id: 'abrir-pivotante', name: 'Abrir (Pivotante)' },
-      { id: 'correr-2-folhas', name: 'Correr 2 Folhas' },
-      { id: 'correr-4-folhas', name: 'Correr 4 Folhas' },
-      { id: 'mao-de-amigo', name: 'Mão de Amigo' },
-    ],
-  },
-  {
-    id: 'box',
-    name: 'Box (Banheiro)',
-    icon: <Bath className="w-8 h-8" />,
-    models: [
-      { id: 'frontal-1-fixo-1-movel', name: 'Frontal (1 Fixo 1 Móvel)' },
-      { id: 'canto-l', name: 'Canto (L)' },
-      { id: 'abrir-pivotante', name: 'Abrir (Pivotante)' },
-      { id: 'box-ate-teto', name: 'Box até o Teto' },
-    ],
-  },
-  {
-    id: 'guarda-corpo',
-    name: 'Guarda-Corpo',
-    icon: <Shield className="w-8 h-8" />,
-    models: [
-      { id: 'torre', name: 'Torre' },
-      { id: 'botao', name: 'Botão' },
-      { id: 'perfil-u', name: 'Perfil U' },
-    ],
-  },
-  {
-    id: 'envidracamento',
-    name: 'Envidraçamento/Sacada',
-    icon: <Blinds className="w-8 h-8" />,
-    models: [
-      { id: 'fixo', name: 'Fixo' },
-      { id: 'correr', name: 'Correr' },
-      { id: 'basculante', name: 'Basculante' },
-    ],
-  },
-  {
-    id: 'espelhos',
-    name: 'Espelhos',
-    icon: <Frame className="w-8 h-8" />,
-    models: [
-      { id: 'espelho-simples', name: 'Espelho Simples' },
-      { id: 'espelho-com-moldura', name: 'Espelho com Moldura' },
-    ],
-  },
-  {
-    id: 'fixos',
-    name: 'Fixos/Vitrines',
-    icon: <Square className="w-8 h-8" />,
-    models: [
-      { id: 'vitrine-simples', name: 'Vitrine Simples' },
-      { id: 'vitrine-com-porta', name: 'Vitrine com Porta' },
-    ],
-  },
-  {
-    id: 'outros',
-    name: 'Outros/Manual',
-    icon: <Plus className="w-8 h-8" />,
-    models: [],
-  },
-];
+// Models configuration per category (for all segments)
+const CATEGORY_MODELS: Record<string, { id: string; name: string }[]> = {
+  // Glazier models
+  'janelas': [
+    { id: '2-folhas-correr', name: '2 Folhas Correr' },
+    { id: '4-folhas-correr', name: '4 Folhas Correr' },
+    { id: 'basculante', name: 'Basculante' },
+    { id: 'maxim-ar', name: 'Maxim-ar' },
+  ],
+  'portas': [
+    { id: 'abrir-pivotante', name: 'Abrir (Pivotante)' },
+    { id: 'correr-2-folhas', name: 'Correr 2 Folhas' },
+    { id: 'correr-4-folhas', name: 'Correr 4 Folhas' },
+    { id: 'mao-de-amigo', name: 'Mão de Amigo' },
+  ],
+  'box': [
+    { id: 'frontal-1-fixo-1-movel', name: 'Frontal (1 Fixo 1 Móvel)' },
+    { id: 'canto-l', name: 'Canto (L)' },
+    { id: 'abrir-pivotante', name: 'Abrir (Pivotante)' },
+    { id: 'box-ate-teto', name: 'Box até o Teto' },
+  ],
+  'guarda-corpo': [
+    { id: 'torre', name: 'Torre' },
+    { id: 'botao', name: 'Botão' },
+    { id: 'perfil-u', name: 'Perfil U' },
+  ],
+  'envidracamento': [
+    { id: 'fixo', name: 'Fixo' },
+    { id: 'correr', name: 'Correr' },
+    { id: 'basculante', name: 'Basculante' },
+  ],
+  'espelhos': [
+    { id: 'espelho-simples', name: 'Espelho Simples' },
+    { id: 'espelho-com-moldura', name: 'Espelho com Moldura' },
+  ],
+  'fixos': [
+    { id: 'vitrine-simples', name: 'Vitrine Simples' },
+    { id: 'vitrine-com-porta', name: 'Vitrine com Porta' },
+  ],
+  // Locksmith models
+  'abertura': [
+    { id: 'porta-residencial', name: 'Porta Residencial' },
+    { id: 'porta-comercial', name: 'Porta Comercial' },
+    { id: 'porta-carro', name: 'Porta de Carro' },
+  ],
+  'copias': [
+    { id: 'chave-simples', name: 'Chave Simples' },
+    { id: 'chave-codificada', name: 'Chave Codificada' },
+    { id: 'chave-transponder', name: 'Chave Transponder' },
+  ],
+  'fechaduras': [
+    { id: 'instalacao', name: 'Instalação' },
+    { id: 'troca', name: 'Troca' },
+    { id: 'conserto', name: 'Conserto' },
+  ],
+  'automotivo': [
+    { id: 'abertura-carro', name: 'Abertura de Carro' },
+    { id: 'copia-chave-carro', name: 'Cópia de Chave de Carro' },
+    { id: 'programacao-chave', name: 'Programação de Chave' },
+  ],
+  'cofres': [
+    { id: 'abertura-cofre', name: 'Abertura de Cofre' },
+    { id: 'troca-senha', name: 'Troca de Senha' },
+  ],
+  // Plumber models
+  'vazamento': [
+    { id: 'detectar-vazamento', name: 'Detectar Vazamento' },
+    { id: 'consertar-vazamento', name: 'Consertar Vazamento' },
+  ],
+  'loucas': [
+    { id: 'instalar-torneira', name: 'Instalar Torneira' },
+    { id: 'instalar-vaso', name: 'Instalar Vaso' },
+    { id: 'instalar-chuveiro', name: 'Instalar Chuveiro' },
+  ],
+  'tubulacao': [
+    { id: 'instalar-tubos', name: 'Instalar Tubos' },
+    { id: 'trocar-tubos', name: 'Trocar Tubos' },
+    { id: 'consertar-esgoto', name: 'Consertar Esgoto' },
+  ],
+  'caixa_agua': [
+    { id: 'limpeza', name: 'Limpeza' },
+    { id: 'instalacao', name: 'Instalação' },
+    { id: 'manutencao', name: 'Manutenção' },
+  ],
+  'desentupimento': [
+    { id: 'pia', name: 'Pia' },
+    { id: 'vaso', name: 'Vaso' },
+    { id: 'ralo', name: 'Ralo' },
+  ],
+  // Handyman models
+  'montagem': [
+    { id: 'armario', name: 'Armário' },
+    { id: 'estante', name: 'Estante' },
+    { id: 'mesa', name: 'Mesa' },
+  ],
+  'instalacao': [
+    { id: 'cortina', name: 'Cortina' },
+    { id: 'quadro', name: 'Quadro' },
+    { id: 'prateleira', name: 'Prateleira' },
+  ],
+  'pequenos_reparos': [
+    { id: 'porta-travando', name: 'Porta Travando' },
+    { id: 'janela-queimada', name: 'Janela Queimada' },
+    { id: 'gaveta-solta', name: 'Gaveta Solta' },
+  ],
+  'eletrica_basica': [
+    { id: 'trocar-tomada', name: 'Trocar Tomada' },
+    { id: 'trocar-interruptor', name: 'Trocar Interruptor' },
+    { id: 'instalar-luminaria', name: 'Instalar Luminária' },
+  ],
+  'hidraulica_basica': [
+    { id: 'trocar-registro', name: 'Trocar Registro' },
+    { id: 'consertar-torneira', name: 'Consertar Torneira' },
+  ],
+};
 
 const GLASS_COLORS = ['Incolor', 'Verde', 'Fumê', 'Bronze'];
 const GLASS_THICKNESS = ['6mm', '8mm', '10mm'];
@@ -135,9 +167,17 @@ const PROFILE_COLORS = ['Branco', 'Preto', 'Fosco', 'Bronze', 'Cromado'];
 export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuilderProps) {
   const { company } = useCompany();
   const segment = company?.segment || 'glazier'; // Default to glazier
+  const segmentConfig = getSegmentConfig(segment);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log("VisualQuoteBuilder - Current Segment:", segment);
+    console.log("VisualQuoteBuilder - Company:", company);
+    console.log("VisualQuoteBuilder - Segment Config:", segmentConfig);
+  }, [segment, company, segmentConfig]);
   
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryConfig | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<{ id: string; label: string; icon: string } | null>(null);
   const [selectedModel, setSelectedModel] = useState<{ id: string; name: string } | null>(null);
   
   // Step 3 - Configuration
@@ -175,8 +215,17 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
   };
 
   const handleSave = () => {
-    if (!selectedCategory || !selectedModel) {
-      alert('Selecione uma categoria e modelo');
+    if (!selectedCategory) {
+      alert('Selecione uma categoria');
+      return;
+    }
+
+    // For segments without models, skip model selection
+    const models = selectedCategory ? CATEGORY_MODELS[selectedCategory.id] || [] : [];
+    const hasModels = models.length > 0;
+    
+    if (hasModels && !selectedModel) {
+      alert('Selecione um modelo');
       return;
     }
 
@@ -208,8 +257,8 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
     }
 
     const serviceName = segment === 'locksmith' || segment === 'handyman'
-      ? (description || `${selectedCategory.name} - ${selectedModel.name}`)
-      : `${selectedCategory.name} - ${selectedModel.name}`;
+      ? (description || `${selectedCategory.label}${selectedModel ? ` - ${selectedModel.name}` : ''}`)
+      : `${selectedCategory.label}${selectedModel ? ` - ${selectedModel.name}` : ''}`;
 
     const item: QuoteItem = {
       serviceName,
@@ -217,7 +266,7 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
       unitPrice: finalUnitPrice,
       total: finalTotal,
       category: selectedCategory.id,
-      model: selectedModel.id,
+      model: selectedModel?.id,
     };
 
     // Only include dimensions for glazier
@@ -259,7 +308,7 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
   // Auto-fill description when category/model changes for locksmith/handyman
   const updateDescription = () => {
     if ((segment === 'locksmith' || segment === 'handyman') && selectedCategory && selectedModel) {
-      setDescription(`${selectedCategory.name} - ${selectedModel.name}`);
+      setDescription(`${selectedCategory.label} - ${selectedModel.name}`);
     }
   };
 
@@ -311,36 +360,41 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
           </Button>
         </div>
 
-        {/* Step 1: Category Selection */}
-        {step === 1 && (
+        {/* Step 1: Category Selection - Dynamic based on segment */}
+        {step === 1 && segmentConfig && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {CATEGORIES.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => {
-                  setSelectedCategory(category);
-                  if (category.id === 'outros' || category.models.length === 0) {
-                    // Skip to step 3 for manual/others
-                    setSelectedModel({ id: 'manual', name: 'Manual' });
-                    setStep(3);
-                    updateDescription();
-                  } else {
-                    setStep(2);
-                  }
-                }}
-                className="h-32 flex flex-col items-center justify-center bg-white border-2 border-slate-200 rounded-xl hover:border-navy hover:bg-navy-50 transition-all shadow-md"
-              >
-                <div className="text-navy mb-2">{category.icon}</div>
-                <span className="text-sm font-medium text-navy">{category.name}</span>
-              </button>
-            ))}
+            {segmentConfig.visualCategories.map((category) => {
+              const models = CATEGORY_MODELS[category.id] || [];
+              const hasModels = models.length > 0;
+              
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => {
+                    setSelectedCategory(category);
+                    if (!hasModels || category.id === 'outros') {
+                      // Skip to step 3 for categories without models or "outros"
+                      setSelectedModel({ id: 'manual', name: 'Manual' });
+                      setStep(3);
+                      updateDescription();
+                    } else {
+                      setStep(2);
+                    }
+                  }}
+                  className="h-32 flex flex-col items-center justify-center bg-white border-2 border-slate-200 rounded-xl hover:border-navy hover:bg-navy-50 transition-all shadow-md"
+                >
+                  <div className="text-navy mb-2">{getIconComponent(category.icon)}</div>
+                  <span className="text-sm font-medium text-navy text-center px-2">{category.label}</span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* Step 2: Model Selection */}
+        {/* Step 2: Model Selection - Dynamic based on selected category */}
         {step === 2 && selectedCategory && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {selectedCategory.models.map((model) => (
+            {(CATEGORY_MODELS[selectedCategory.id] || []).map((model: { id: string; name: string }) => (
               <button
                 key={model.id}
                 onClick={() => {
@@ -357,14 +411,14 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
         )}
 
         {/* Step 3: Configuration */}
-        {step === 3 && selectedCategory && selectedModel && (
+        {step === 3 && selectedCategory && (
           <div className="space-y-6">
             {/* Selected Model Header */}
             <div className="bg-navy-50 p-4 rounded-lg flex items-center gap-3">
-              <div className="text-navy">{selectedCategory.icon}</div>
+              <div className="text-navy">{selectedCategory && getIconComponent(selectedCategory.icon)}</div>
               <div>
-                <h3 className="font-bold text-navy">{selectedCategory.name}</h3>
-                <p className="text-sm text-slate-600">{selectedModel.name}</p>
+                <h3 className="font-bold text-navy">{selectedCategory?.label}</h3>
+                {selectedModel && <p className="text-sm text-slate-600">{selectedModel.name}</p>}
               </div>
             </div>
 
