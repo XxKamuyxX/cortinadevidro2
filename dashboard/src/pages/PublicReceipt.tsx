@@ -6,6 +6,12 @@ import { Loader2, Download, Star } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { ReceiptPDF } from '../components/ReceiptPDF';
 
+interface ManualService {
+  id: string;
+  description: string;
+  price?: number;
+}
+
 interface Receipt {
   id: string;
   workOrderId: string;
@@ -15,6 +21,8 @@ interface Receipt {
   items?: any[];
   notes?: string;
   companyId?: string;
+  manualServices?: ManualService[];
+  manualServicesTotal?: number;
 }
 
 export function PublicReceipt() {
@@ -106,6 +114,8 @@ export function PublicReceipt() {
           total={receipt.amount}
           warranty={workOrder.warranty}
           companyData={companyData}
+          manualServices={receipt.manualServices || workOrder.manualServices || []}
+          manualServicesTotal={receipt.manualServicesTotal || workOrder.totalPrice || 0}
         />
       );
 

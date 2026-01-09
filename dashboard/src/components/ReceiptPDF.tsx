@@ -7,6 +7,12 @@ interface ReceiptItem {
   total: number;
 }
 
+interface ManualService {
+  id: string;
+  description: string;
+  price?: number;
+}
+
 interface ChecklistItem {
   task: string;
   completed: boolean;
@@ -36,6 +42,8 @@ interface ReceiptPDFProps {
   photos?: string[];
   hasRisk?: boolean;
   companyData?: CompanyData;
+  manualServices?: ManualService[];
+  manualServicesTotal?: number;
 }
 
 const styles = StyleSheet.create({
@@ -264,6 +272,8 @@ export function ReceiptPDF({
   photos = [],
   hasRisk = false,
   companyData,
+  manualServices = [],
+  manualServicesTotal = 0,
 }: ReceiptPDFProps) {
   // Fallback to default values if companyData is not provided
   const company = companyData || {
@@ -333,7 +343,7 @@ export function ReceiptPDF({
           <Text style={styles.value}>{technician || 'Não informado'}</Text>
         </View>
 
-        {/* Services Table */}
+        {/* Services Table from Quote */}
         {items.length > 0 && (
           <View style={styles.table}>
             <View style={styles.tableHeader}>
@@ -348,6 +358,30 @@ export function ReceiptPDF({
                 <Text style={styles.tableCellCenter}>{item.quantity}</Text>
                 <Text style={styles.tableCellRight}>{formatCurrency(item.unitPrice)}</Text>
                 <Text style={styles.tableCellRight}>{formatCurrency(item.total)}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Manual Services */}
+        {manualServices.length > 0 && (
+          <View style={styles.table}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 3 }]}>SERVIÇO REALIZADO</Text>
+              <Text style={styles.tableCellCenter}>QTD</Text>
+              <Text style={styles.tableCellRight}>VALOR UNIT.</Text>
+              <Text style={styles.tableCellRight}>TOTAL</Text>
+            </View>
+            {manualServices.map((service) => (
+              <View key={service.id} style={styles.tableRow}>
+                <Text style={[styles.tableCell, { flex: 3 }]}>{service.description}</Text>
+                <Text style={styles.tableCellCenter}>1</Text>
+                <Text style={styles.tableCellRight}>
+                  {service.price ? formatCurrency(service.price) : '-'}
+                </Text>
+                <Text style={styles.tableCellRight}>
+                  {service.price ? formatCurrency(service.price) : '-'}
+                </Text>
               </View>
             ))}
           </View>
@@ -373,7 +407,13 @@ export function ReceiptPDF({
         {/* Total */}
         <View style={styles.total}>
           <Text>TOTAL RECEBIDO:</Text>
-          <Text>{formatCurrency(total)}</Text>
+          <Text>
+            {formatCurrency(
+              manualServicesTotal > 0 
+                ? (total + manualServicesTotal)
+                : (manualServicesTotal > 0 ? manualServicesTotal : total)
+            )}
+          </Text>
         </View>
 
         {/* Warranty */}

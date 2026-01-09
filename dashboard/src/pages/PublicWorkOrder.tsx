@@ -151,6 +151,8 @@ export function PublicWorkOrder() {
           total={quote.total || 0}
           warranty={quote.warranty}
           companyData={companyData}
+          manualServices={workOrder.manualServices || []}
+          manualServicesTotal={workOrder.totalPrice || 0}
         />
       );
 

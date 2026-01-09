@@ -10,6 +10,7 @@ import { ImageUpload } from '../components/ImageUpload';
 import { TechnicalInspection } from '../components/TechnicalInspection';
 import { WhatsAppButton } from '../components/WhatsAppButton';
 import { useCompany } from '../hooks/useCompany';
+import { CurrencyInput } from '../components/ui/CurrencyInput';
 
 interface ManualService {
   id: string;
@@ -56,7 +57,7 @@ export function WorkOrderDetails() {
   const [manualServices, setManualServices] = useState<ManualService[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
-  const [newService, setNewService] = useState({ description: '', price: '' });
+  const [newService, setNewService] = useState({ description: '', price: 0 });
 
   useEffect(() => {
     if (id) {
@@ -88,6 +89,8 @@ export function WorkOrderDetails() {
       setClientPhone(data.clientPhone || '');
       setManualServices(data.manualServices || []);
       setTotalPrice(data.totalPrice || 0);
+      setScheduledTime(data.scheduledTime || '');
+      setHasRisk(data.hasRisk || false);
 
       // Load client phone from quote if not in workOrder
       if (!data.clientPhone && data.quoteId) {
@@ -178,6 +181,8 @@ export function WorkOrderDetails() {
         amount: receiptAmount,
         paymentDate: new Date(),
         items: quoteData?.items || [],
+        manualServices: manualServices,
+        manualServicesTotal: totalPrice,
         notes: workOrder.notes || '',
         photos: workOrder.photos || [],
         hasRisk: workOrder.hasRisk || false,
@@ -514,11 +519,11 @@ export function WorkOrderDetails() {
                         )}
                       </div>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           const updated = manualServices.filter(s => s.id !== service.id);
                           setManualServices(updated);
                           if (id) {
-                            updateDoc(doc(db, 'workOrders', id), {
+                            await updateDoc(doc(db, 'workOrders', id), {
                               manualServices: updated,
                             });
                           }
@@ -540,16 +545,12 @@ export function WorkOrderDetails() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Total (R$)
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
+                <CurrencyInput
                   value={totalPrice}
-                  onChange={(e) => {
-                    const value = parseFloat(e.target.value) || 0;
+                  onChange={async (value) => {
                     setTotalPrice(value);
                     if (id) {
-                      updateDoc(doc(db, 'workOrders', id), {
+                      await updateDoc(doc(db, 'workOrders', id), {
                         totalPrice: value,
                       });
                     }
@@ -741,7 +742,7 @@ export function WorkOrderDetails() {
                 <button
                   onClick={() => {
                     setShowAddServiceModal(false);
-                    setNewService({ description: '', price: '' });
+                    setNewService({ description: '', price: 0 });
                   }}
                   className="text-slate-400 hover:text-slate-600"
                 >
@@ -765,12 +766,9 @@ export function WorkOrderDetails() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Preço (R$) - Opcional
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <CurrencyInput
                     value={newService.price}
-                    onChange={(e) => setNewService({ ...newService, price: e.target.value })}
+                    onChange={(value) => setNewService({ ...newService, price: value })}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                     placeholder="0,00"
                   />
@@ -778,7 +776,7 @@ export function WorkOrderDetails() {
                 <div className="flex gap-4">
                   <Button
                     variant="primary"
-                    onClick={() => {
+                    onClick={async () => {
                       if (!newService.description.trim()) {
                         alert('Digite a descrição do serviço');
                         return;
@@ -786,17 +784,17 @@ export function WorkOrderDetails() {
                       const service: ManualService = {
                         id: Date.now().toString(),
                         description: newService.description,
-                        price: newService.price ? parseFloat(newService.price) : undefined,
+                        price: newService.price > 0 ? newService.price : undefined,
                       };
                       const updated = [...manualServices, service];
                       setManualServices(updated);
                       if (id) {
-                        updateDoc(doc(db, 'workOrders', id), {
+                        await updateDoc(doc(db, 'workOrders', id), {
                           manualServices: updated,
                         });
                       }
                       setShowAddServiceModal(false);
-                      setNewService({ description: '', price: '' });
+                      setNewService({ description: '', price: 0 });
                     }}
                     className="flex-1"
                   >
@@ -806,7 +804,7 @@ export function WorkOrderDetails() {
                     variant="outline"
                     onClick={() => {
                       setShowAddServiceModal(false);
-                      setNewService({ description: '', price: '' });
+                      setNewService({ description: '', price: 0 });
                     }}
                     className="flex-1"
                   >
@@ -836,13 +834,11 @@ export function WorkOrderDetails() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Valor do Recibo (R$)
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <CurrencyInput
                     value={receiptAmount}
-                    onChange={(e) => setReceiptAmount(parseFloat(e.target.value) || 0)}
+                    onChange={(value) => setReceiptAmount(value)}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    placeholder="0,00"
                   />
                 </div>
                 <div className="flex gap-4">

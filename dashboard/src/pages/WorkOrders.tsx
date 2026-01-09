@@ -140,6 +140,10 @@ export function WorkOrders() {
 
   const handleGenerateReceipt = async (order: WorkOrder) => {
     try {
+      // Buscar dados completos da OS
+      const orderDoc = await getDoc(doc(db, 'workOrders', order.id));
+      const orderData = orderDoc.exists() ? orderDoc.data() : null;
+
       // Buscar dados do orçamento relacionado
       let quoteData = null;
       if (order.quoteId) {
@@ -176,6 +180,8 @@ export function WorkOrders() {
             logoUrl: logoBase64 || company.logoUrl || undefined,
             cnpj: company.cnpj || '',
           } : undefined}
+          manualServices={orderData?.manualServices || []}
+          manualServicesTotal={orderData?.totalPrice || 0}
         />
       );
 
