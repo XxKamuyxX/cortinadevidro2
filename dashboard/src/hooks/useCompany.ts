@@ -14,6 +14,7 @@ export interface CompanyData {
   signatureUrl?: string;
   primaryColor?: string;
   contractTemplate?: string;
+  segment?: string; // 'glazier' | 'locksmith' | 'plumber' | 'handyman'
   createdAt?: any;
   updatedAt?: any;
 }

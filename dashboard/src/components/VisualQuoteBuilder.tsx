@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { useCompany } from '../hooks/useCompany';
 import { 
   AppWindow, 
   DoorOpen, 
@@ -132,17 +133,23 @@ const GLASS_THICKNESS = ['6mm', '8mm', '10mm'];
 const PROFILE_COLORS = ['Branco', 'Preto', 'Fosco', 'Bronze', 'Cromado'];
 
 export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuilderProps) {
+  const { company } = useCompany();
+  const segment = company?.segment || 'glazier'; // Default to glazier
+  
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedCategory, setSelectedCategory] = useState<CategoryConfig | null>(null);
   const [selectedModel, setSelectedModel] = useState<{ id: string; name: string } | null>(null);
   
   // Step 3 - Configuration
+  const [description, setDescription] = useState('');
   const [height, setHeight] = useState('');
   const [width, setWidth] = useState('');
+  const [linearMeters, setLinearMeters] = useState('');
   const [glassColor, setGlassColor] = useState('');
   const [glassThickness, setGlassThickness] = useState('');
   const [profileColor, setProfileColor] = useState('');
   const [pricePerM2, setPricePerM2] = useState('');
+  const [unitPrice, setUnitPrice] = useState('');
   const [totalPrice, setTotalPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
 
@@ -173,26 +180,60 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
       return;
     }
 
-    const m2 = parseFloat(calculateM2());
-    const price = parseFloat(pricePerM2) || 0;
     const qty = parseFloat(quantity) || 1;
-    const finalTotal = parseFloat(calculateTotal()) || parseFloat(totalPrice) || 0;
+    let finalTotal = 0;
+    let finalUnitPrice = 0;
+
+    // Calculate based on segment
+    if (segment === 'locksmith' || segment === 'handyman') {
+      // Simple: quantity * unit price OR total price
+      finalTotal = parseFloat(totalPrice) || (parseFloat(unitPrice) * qty);
+      finalUnitPrice = parseFloat(unitPrice) || (finalTotal / qty);
+    } else if (segment === 'plumber') {
+      // Can use linear meters or quantity
+      const meters = parseFloat(linearMeters) || qty;
+      if (pricePerM2) {
+        finalTotal = parseFloat(pricePerM2) * meters * qty;
+        finalUnitPrice = parseFloat(pricePerM2);
+      } else {
+        finalTotal = parseFloat(totalPrice) || 0;
+        finalUnitPrice = finalTotal / (meters * qty || 1);
+      }
+    } else {
+      // Glazier: m² calculation
+      const m2 = parseFloat(calculateM2());
+      const price = parseFloat(pricePerM2) || 0;
+      finalTotal = parseFloat(calculateTotal()) || parseFloat(totalPrice) || 0;
+      finalUnitPrice = price > 0 ? price : finalTotal / (m2 * qty || 1);
+    }
+
+    const serviceName = segment === 'locksmith' || segment === 'handyman'
+      ? (description || `${selectedCategory.name} - ${selectedModel.name}`)
+      : `${selectedCategory.name} - ${selectedModel.name}`;
 
     const item: QuoteItem = {
-      serviceName: `${selectedCategory.name} - ${selectedModel.name}`,
+      serviceName,
       quantity: qty,
-      unitPrice: price > 0 ? price : finalTotal / (m2 * qty || 1),
+      unitPrice: finalUnitPrice,
       total: finalTotal,
       category: selectedCategory.id,
       model: selectedModel.id,
-      dimensions: {
+    };
+
+    // Only include dimensions for glazier
+    if (segment === 'glazier' && (width || height)) {
+      item.dimensions = {
         width: parseFloat(width) || undefined,
         height: parseFloat(height) || undefined,
-      },
-      glassColor: glassColor || undefined,
-      glassThickness: glassThickness || undefined,
-      profileColor: profileColor || undefined,
-    };
+      };
+    }
+
+    // Only include glass props for glazier
+    if (segment === 'glazier') {
+      if (glassColor) item.glassColor = glassColor;
+      if (glassThickness) item.glassThickness = glassThickness;
+      if (profileColor) item.profileColor = profileColor;
+    }
 
     onSave(item);
     handleReset();
@@ -202,14 +243,24 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
     setStep(1);
     setSelectedCategory(null);
     setSelectedModel(null);
+    setDescription('');
     setHeight('');
     setWidth('');
+    setLinearMeters('');
     setGlassColor('');
     setGlassThickness('');
     setProfileColor('');
     setPricePerM2('');
+    setUnitPrice('');
     setTotalPrice('');
     setQuantity('1');
+  };
+
+  // Auto-fill description when category/model changes for locksmith/handyman
+  const updateDescription = () => {
+    if ((segment === 'locksmith' || segment === 'handyman') && selectedCategory && selectedModel) {
+      setDescription(`${selectedCategory.name} - ${selectedModel.name}`);
+    }
   };
 
   const handleClose = () => {
@@ -272,6 +323,7 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
                     // Skip to step 3 for manual/others
                     setSelectedModel({ id: 'manual', name: 'Manual' });
                     setStep(3);
+                    updateDescription();
                   } else {
                     setStep(2);
                   }
@@ -294,6 +346,7 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
                 onClick={() => {
                   setSelectedModel(model);
                   setStep(3);
+                  updateDescription();
                 }}
                 className="h-24 flex items-center justify-center bg-white border-2 border-slate-200 rounded-xl hover:border-navy hover:bg-navy-50 transition-all shadow-md px-4"
               >
@@ -315,45 +368,205 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
               </div>
             </div>
 
-            {/* Dimensions */}
-            <div>
-              <h3 className="text-lg font-bold text-navy mb-4">Dimensões</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Altura (mm)"
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  placeholder="Ex: 2000"
-                />
-                <Input
-                  label="Largura (mm)"
-                  type="number"
-                  value={width}
-                  onChange={(e) => setWidth(e.target.value)}
-                  placeholder="Ex: 1500"
-                />
-              </div>
-              {height && width && (
-                <p className="mt-2 text-sm text-slate-600">
-                  Área calculada: <span className="font-bold text-navy">{calculateM2()} m²</span>
-                </p>
-              )}
-            </div>
-
-            {/* Glass Selection */}
-            <div>
-              <h3 className="text-lg font-bold text-navy mb-4">Vidro</h3>
-              <div className="space-y-3">
+            {/* Locksmith & Handyman: Simplified Form */}
+            {(segment === 'locksmith' || segment === 'handyman') && (
+              <div className="space-y-6">
+                {/* Description */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Cor</label>
+                  <Input
+                    label="Descrição do Serviço *"
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder={
+                      segment === 'locksmith'
+                        ? "Ex: Abertura de porta sem dano"
+                        : "Ex: Montagem de armário de cozinha"
+                    }
+                    required
+                    className="text-lg"
+                  />
+                </div>
+
+                {/* Pricing - Centered and Big */}
+                <div className="max-w-md mx-auto space-y-4">
+                  <Input
+                    label="Quantidade"
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    min="1"
+                    className="text-lg"
+                  />
+                  <Input
+                    label="Preço Unitário (R$)"
+                    type="number"
+                    value={unitPrice}
+                    onChange={(e) => {
+                      setUnitPrice(e.target.value);
+                      setTotalPrice('');
+                    }}
+                    placeholder="Ex: 150.00"
+                    className="text-lg"
+                  />
+                  <Input
+                    label="Preço Total (R$)"
+                    type="number"
+                    value={totalPrice || (parseFloat(unitPrice) * parseFloat(quantity) || 0).toFixed(2)}
+                    onChange={(e) => {
+                      setTotalPrice(e.target.value);
+                      setUnitPrice('');
+                    }}
+                    placeholder="Ex: 450.00"
+                    className="text-lg"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Plumber: Linear Meters or Quantity */}
+            {segment === 'plumber' && (
+              <div className="space-y-6">
+                {/* Description */}
+                <div>
+                  <Input
+                    label="Descrição do Serviço"
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Ex: Instalação de torneira"
+                  />
+                </div>
+
+                {/* Quantity/Linear Meters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Input
+                    label="Quantidade"
+                    type="number"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    min="1"
+                  />
+                  <Input
+                    label="Metros Lineares (m)"
+                    type="number"
+                    value={linearMeters}
+                    onChange={(e) => setLinearMeters(e.target.value)}
+                    placeholder="Ex: 5.5"
+                  />
+                </div>
+
+                {/* Pricing */}
+                <div>
+                  <h3 className="text-lg font-bold text-navy mb-4">Precificação</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
+                      label="Preço por Metro (R$)"
+                      type="number"
+                      value={pricePerM2}
+                      onChange={(e) => {
+                        setPricePerM2(e.target.value);
+                        setTotalPrice('');
+                      }}
+                      placeholder="Ex: 50.00"
+                    />
+                    <Input
+                      label="Preço Total (R$)"
+                      type="number"
+                      value={totalPrice || (linearMeters ? (parseFloat(pricePerM2) * parseFloat(linearMeters) * parseFloat(quantity) || 0).toFixed(2) : '')}
+                      onChange={(e) => {
+                        setTotalPrice(e.target.value);
+                        setPricePerM2('');
+                      }}
+                      placeholder="Ex: 275.00"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Glazier: Full Form with Dimensions and Glass */}
+            {segment === 'glazier' && (
+              <>
+                {/* Dimensions */}
+                <div>
+                  <h3 className="text-lg font-bold text-navy mb-4">Dimensões</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      label="Altura (mm)"
+                      type="number"
+                      value={height}
+                      onChange={(e) => setHeight(e.target.value)}
+                      placeholder="Ex: 2000"
+                    />
+                    <Input
+                      label="Largura (mm)"
+                      type="number"
+                      value={width}
+                      onChange={(e) => setWidth(e.target.value)}
+                      placeholder="Ex: 1500"
+                    />
+                  </div>
+                  {height && width && (
+                    <p className="mt-2 text-sm text-slate-600">
+                      Área calculada: <span className="font-bold text-navy">{calculateM2()} m²</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Glass Selection */}
+                <div>
+                  <h3 className="text-lg font-bold text-navy mb-4">Vidro</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Cor</label>
+                      <div className="flex flex-wrap gap-2">
+                        {GLASS_COLORS.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => setGlassColor(glassColor === color ? '' : color)}
+                            className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                              glassColor === color
+                                ? 'border-navy bg-navy text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-navy'
+                            }`}
+                          >
+                            {color}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-2">Espessura</label>
+                      <div className="flex flex-wrap gap-2">
+                        {GLASS_THICKNESS.map((thickness) => (
+                          <button
+                            key={thickness}
+                            onClick={() => setGlassThickness(glassThickness === thickness ? '' : thickness)}
+                            className={`px-4 py-2 rounded-lg border-2 transition-all ${
+                              glassThickness === thickness
+                                ? 'border-navy bg-navy text-white'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-navy'
+                            }`}
+                          >
+                            {thickness}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Profile/Kit Selection */}
+                <div>
+                  <h3 className="text-lg font-bold text-navy mb-4">Acabamento/Kit</h3>
                   <div className="flex flex-wrap gap-2">
-                    {GLASS_COLORS.map((color) => (
+                    {PROFILE_COLORS.map((color) => (
                       <button
                         key={color}
-                        onClick={() => setGlassColor(glassColor === color ? '' : color)}
+                        onClick={() => setProfileColor(profileColor === color ? '' : color)}
                         className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                          glassColor === color
+                          profileColor === color
                             ? 'border-navy bg-navy text-white'
                             : 'border-slate-200 bg-white text-slate-700 hover:border-navy'
                         }`}
@@ -363,80 +576,42 @@ export function VisualQuoteBuilder({ isOpen, onClose, onSave }: VisualQuoteBuild
                     ))}
                   </div>
                 </div>
+
+                {/* Pricing */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Espessura</label>
-                  <div className="flex flex-wrap gap-2">
-                    {GLASS_THICKNESS.map((thickness) => (
-                      <button
-                        key={thickness}
-                        onClick={() => setGlassThickness(glassThickness === thickness ? '' : thickness)}
-                        className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                          glassThickness === thickness
-                            ? 'border-navy bg-navy text-white'
-                            : 'border-slate-200 bg-white text-slate-700 hover:border-navy'
-                        }`}
-                      >
-                        {thickness}
-                      </button>
-                    ))}
+                  <h3 className="text-lg font-bold text-navy mb-4">Precificação</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Input
+                      label="Quantidade"
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      min="1"
+                    />
+                    <Input
+                      label="Preço por m² (R$)"
+                      type="number"
+                      value={pricePerM2}
+                      onChange={(e) => {
+                        setPricePerM2(e.target.value);
+                        setTotalPrice('');
+                      }}
+                      placeholder="Ex: 150.00"
+                    />
+                    <Input
+                      label="Preço Total (R$)"
+                      type="number"
+                      value={totalPrice || calculateTotal()}
+                      onChange={(e) => {
+                        setTotalPrice(e.target.value);
+                        setPricePerM2('');
+                      }}
+                      placeholder="Ex: 450.00"
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Profile/Kit Selection */}
-            <div>
-              <h3 className="text-lg font-bold text-navy mb-4">Acabamento/Kit</h3>
-              <div className="flex flex-wrap gap-2">
-                {PROFILE_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => setProfileColor(profileColor === color ? '' : color)}
-                    className={`px-4 py-2 rounded-lg border-2 transition-all ${
-                      profileColor === color
-                        ? 'border-navy bg-navy text-white'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-navy'
-                    }`}
-                  >
-                    {color}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Pricing */}
-            <div>
-              <h3 className="text-lg font-bold text-navy mb-4">Precificação</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Quantidade"
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  min="1"
-                />
-                <Input
-                  label="Preço por m² (R$)"
-                  type="number"
-                  value={pricePerM2}
-                  onChange={(e) => {
-                    setPricePerM2(e.target.value);
-                    setTotalPrice('');
-                  }}
-                  placeholder="Ex: 150.00"
-                />
-                <Input
-                  label="Preço Total (R$)"
-                  type="number"
-                  value={totalPrice || calculateTotal()}
-                  onChange={(e) => {
-                    setTotalPrice(e.target.value);
-                    setPricePerM2('');
-                  }}
-                  placeholder="Ex: 450.00"
-                />
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Actions */}
             <div className="flex gap-4 pt-4 border-t border-slate-200">
