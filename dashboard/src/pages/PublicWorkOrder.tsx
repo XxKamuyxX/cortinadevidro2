@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Loader2, Download, CheckCircle2, XCircle } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
@@ -43,6 +43,10 @@ interface WorkOrder {
   };
   manualServices?: ManualService[];
   totalPrice?: number;
+  approved?: boolean;
+  rejected?: boolean;
+  approvedAt?: any;
+  rejectedAt?: any;
 }
 
 export function PublicWorkOrder() {
@@ -51,6 +55,9 @@ export function PublicWorkOrder() {
   const [quote, setQuote] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [company, setCompany] = useState<any>(null);
+  const [updating, setUpdating] = useState(false);
+  const [approved, setApproved] = useState(false);
 
   useEffect(() => {
     if (osId) {
@@ -74,10 +81,28 @@ export function PublicWorkOrder() {
       }
 
       const osData = osDoc.data();
-      setWorkOrder({
+      const wo = {
         id: osDoc.id,
         ...osData,
-      } as WorkOrder);
+      } as WorkOrder;
+      setWorkOrder(wo);
+      
+      if (osData.approved) {
+        setApproved(true);
+      }
+
+      // Load company data for logo
+      if (osData.companyId) {
+        try {
+          const companyDoc = await getDoc(doc(db, 'companies', osData.companyId));
+          if (companyDoc.exists()) {
+            setCompany(companyDoc.data());
+          }
+        } catch (companyErr) {
+          console.warn('Could not load company:', companyErr);
+          // Continue without company data
+        }
+      }
 
       // Load quote if available (optional, don't fail if quote doesn't exist)
       if (osData.quoteId) {
@@ -106,35 +131,107 @@ export function PublicWorkOrder() {
     }
   };
 
+  const handleApprove = async () => {
+    if (!osId || !workOrder) return;
+
+    if (workOrder.approved) {
+      alert('Esta ordem de serviço já foi aprovada');
+      return;
+    }
+
+    if (!confirm('Deseja aprovar esta ordem de serviço?')) {
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      await updateDoc(doc(db, 'workOrders', osId), {
+        approved: true,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      setWorkOrder({ ...workOrder, approved: true });
+      setApproved(true);
+      alert('Ordem de Serviço Aprovada com Sucesso!');
+    } catch (err) {
+      console.error('Error approving work order:', err);
+      alert('Erro ao aprovar ordem de serviço. Tente novamente.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!osId || !workOrder) return;
+
+    if (!confirm('Deseja rejeitar esta ordem de serviço?')) {
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      await updateDoc(doc(db, 'workOrders', osId), {
+        approved: false,
+        rejected: true,
+        rejectedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      alert('Ordem de serviço rejeitada');
+    } catch (err) {
+      console.error('Error rejecting work order:', err);
+      alert('Erro ao rejeitar ordem de serviço. Tente novamente.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleDownloadPDF = async () => {
-    if (!workOrder || !quote) return;
+    if (!workOrder || !osId) return;
 
     try {
+      // Reload workOrder to get latest services
+      const osDoc = await getDoc(doc(db, 'workOrders', osId));
+      const latestWorkOrder = osDoc.exists() ? osDoc.data() : workOrder;
+      
       // Load company data if companyId exists
       let companyData = undefined;
       let logoBase64: string | null = null;
       
-      if (workOrder.companyId || (quote as any).companyId) {
-        const companyId = workOrder.companyId || (quote as any).companyId;
+      const companyId = latestWorkOrder.companyId || workOrder.companyId || (quote as any)?.companyId;
+      if (companyId) {
         const companyDocRef = doc(db, 'companies', companyId);
         const companyDoc = await getDoc(companyDocRef);
         if (companyDoc.exists()) {
-          const company = companyDoc.data();
+          const companyInfo = companyDoc.data();
           
           // Convert logo to base64 to avoid CORS issues
-          if (company.logoUrl) {
+          if (companyInfo.logoUrl) {
             const { getBase64ImageFromUrl } = await import('../utils/imageToBase64');
-            logoBase64 = await getBase64ImageFromUrl(company.logoUrl as string);
+            logoBase64 = await getBase64ImageFromUrl(companyInfo.logoUrl as string);
           }
           
           companyData = {
-            name: company.name as string,
-            address: company.address as string,
-            phone: company.phone as string,
-            email: company.email as string | undefined,
-            logoUrl: logoBase64 || (company.logoUrl as string | undefined),
-            cnpj: company.cnpj as string | undefined,
+            name: companyInfo.name as string,
+            address: companyInfo.address as string,
+            phone: companyInfo.phone as string,
+            email: companyInfo.email as string | undefined,
+            logoUrl: logoBase64 || (companyInfo.logoUrl as string | undefined),
+            cnpj: companyInfo.cnpj as string | undefined,
           };
+        }
+      }
+
+      // Get quote data if available
+      let quoteData = null;
+      if (latestWorkOrder.quoteId || workOrder.quoteId) {
+        const quoteId = latestWorkOrder.quoteId || workOrder.quoteId;
+        try {
+          const quoteDoc = await getDoc(doc(db, 'quotes', quoteId));
+          if (quoteDoc.exists()) {
+            quoteData = quoteDoc.data();
+          }
+        } catch (quoteErr) {
+          console.warn('Could not load quote for PDF:', quoteErr);
         }
       }
 
@@ -147,12 +244,12 @@ export function PublicWorkOrder() {
           technician={workOrder.technician}
           checklist={workOrder.checklist || []}
           notes={workOrder.notes}
-          items={quote.items || []}
-          total={quote.total || 0}
-          warranty={quote.warranty}
+          items={quoteData?.items || quote?.items || []}
+          total={quoteData?.total || quote?.total || 0}
+          warranty={quoteData?.warranty || quote?.warranty || '90 dias'}
           companyData={companyData}
-          manualServices={workOrder.manualServices || []}
-          manualServicesTotal={workOrder.totalPrice || 0}
+          manualServices={latestWorkOrder.manualServices || workOrder.manualServices || []}
+          manualServicesTotal={latestWorkOrder.totalPrice || workOrder.totalPrice || 0}
         />
       );
 
@@ -213,7 +310,11 @@ export function PublicWorkOrder() {
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center justify-center">
-              <img src="/logo.png" alt="House Manutenção" className="h-16 w-16 object-contain" />
+              {company?.logoUrl ? (
+                <img src={company.logoUrl} alt={company.name || 'Logo'} className="h-16 w-16 object-contain" />
+              ) : (
+                <img src="/logo.png" alt="House Manutenção" className="h-16 w-16 object-contain" />
+              )}
             </div>
             <button
               onClick={handleDownloadPDF}
@@ -516,11 +617,51 @@ export function PublicWorkOrder() {
           </div>
         )}
 
+        {/* Approval Status */}
+        {approved && (
+          <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6 mb-6 text-center">
+            <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-green-700 mb-2">Ordem de Serviço Aprovada!</h2>
+            <p className="text-green-600">Esta ordem de serviço já foi aprovada anteriormente.</p>
+          </div>
+        )}
+
+        {/* Action Buttons - Approve/Reject and PDF */}
+        {!approved && (workOrder.status === 'scheduled' || workOrder.status === 'in-progress') && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-bold text-navy mb-4 text-center">Aprovar Ordem de Serviço</h2>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={handleApprove}
+                disabled={updating}
+                className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 className="w-5 h-5" />
+                {updating ? 'Aprovando...' : 'Aprovar Ordem de Serviço'}
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={updating}
+                className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <XCircle className="w-5 h-5" />
+                {updating ? 'Rejeitando...' : 'Rejeitar'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="text-center mt-8 text-slate-600 text-sm">
-          <p>House Manutenção - Especialistas em Cortinas de Vidro</p>
-          <p className="mt-1">Rua Rio Grande do Norte, 726, Savassi, Belo Horizonte - MG</p>
-          <p className="mt-1">Telefone: (31) 98279-8513</p>
+          <p>{company?.name || 'House Manutenção'} - Especialistas em Cortinas de Vidro</p>
+          {company?.address && <p className="mt-1">{company.address}</p>}
+          {company?.phone && <p className="mt-1">Telefone: {company.phone}</p>}
+          {!company && (
+            <>
+              <p className="mt-1">Rua Rio Grande do Norte, 726, Savassi, Belo Horizonte - MG</p>
+              <p className="mt-1">Telefone: (31) 98279-8513</p>
+            </>
+          )}
         </div>
       </div>
     </div>

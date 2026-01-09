@@ -637,9 +637,6 @@ export function WorkOrderDetails() {
                   clientName={workOrder.clientName}
                   docType="OS"
                   docLink={`${window.location.origin}/p/os/${id}`}
-                  approvalLink={(workOrder.status === 'in-progress' || workOrder.status === 'scheduled') 
-                    ? `${window.location.origin}/p/os/${id}/approve` 
-                    : undefined}
                   googleReviewUrl={(company as any)?.googleReviewUrl}
                 />
               </div>
@@ -803,44 +800,51 @@ export function WorkOrderDetails() {
                         alert('Digite a descrição do serviço');
                         return;
                       }
-                      
-                      if (editingServiceId) {
-                        // Edit existing service
-                        const updated = manualServices.map(s => 
-                          s.id === editingServiceId 
-                            ? {
-                                ...s,
-                                description: newService.description,
-                                price: newService.price > 0 ? newService.price : undefined,
-                              }
-                            : s
-                        );
-                        setManualServices(updated);
-                        if (id) {
-                          await updateDoc(doc(db, 'workOrders', id), {
-                            manualServices: updated,
-                          });
-                        }
-                      } else {
-                        // Add new service
-                        const service: ManualService = {
-                          id: Date.now().toString(),
-                          description: newService.description,
-                          price: newService.price > 0 ? newService.price : undefined,
-                        };
-                        const updated = [...manualServices, service];
-                        setManualServices(updated);
-                        if (id) {
-                          await updateDoc(doc(db, 'workOrders', id), {
-                            manualServices: updated,
-                          });
-                        }
+
+                      if (!id) {
+                        alert('Erro: ID da OS não encontrado');
+                        return;
                       }
                       
-                      // Close modal automatically
-                      setShowAddServiceModal(false);
-                      setEditingServiceId(null);
-                      setNewService({ description: '', price: 0 });
+                      try {
+                        if (editingServiceId) {
+                          // Edit existing service
+                          const updated = manualServices.map(s => 
+                            s.id === editingServiceId 
+                              ? {
+                                  ...s,
+                                  description: newService.description,
+                                  price: newService.price > 0 ? newService.price : undefined,
+                                }
+                              : s
+                          );
+                          setManualServices(updated);
+                          await updateDoc(doc(db, 'workOrders', id), {
+                            manualServices: updated,
+                          });
+                        } else {
+                          // Add new service
+                          const service: ManualService = {
+                            id: Date.now().toString(),
+                            description: newService.description,
+                            price: newService.price > 0 ? newService.price : undefined,
+                          };
+                          const updated = [...manualServices, service];
+                          setManualServices(updated);
+                          await updateDoc(doc(db, 'workOrders', id), {
+                            manualServices: updated,
+                          });
+                        }
+                        
+                        // Close modal automatically on success
+                        setShowAddServiceModal(false);
+                        setEditingServiceId(null);
+                        setNewService({ description: '', price: 0 });
+                      } catch (error: any) {
+                        console.error('Error saving service:', error);
+                        alert(`Erro ao salvar serviço: ${error.message || 'Erro desconhecido'}\n\nVerifique o console para mais detalhes.`);
+                        // Don't close modal on error so user can retry
+                      }
                     }}
                     className="flex-1"
                   >
