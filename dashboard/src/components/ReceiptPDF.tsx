@@ -409,9 +409,11 @@ export function ReceiptPDF({
           <Text>TOTAL RECEBIDO:</Text>
           <Text>
             {formatCurrency(
-              manualServicesTotal > 0 
+              manualServicesTotal > 0 && total > 0
                 ? (total + manualServicesTotal)
-                : (manualServicesTotal > 0 ? manualServicesTotal : total)
+                : manualServicesTotal > 0
+                ? manualServicesTotal
+                : total
             )}
           </Text>
         </View>

@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { doc, getDoc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2 } from 'lucide-react';
+import { X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Edit } from 'lucide-react';
 import { ImageUpload } from '../components/ImageUpload';
 import { TechnicalInspection } from '../components/TechnicalInspection';
 import { WhatsAppButton } from '../components/WhatsAppButton';
@@ -57,6 +57,7 @@ export function WorkOrderDetails() {
   const [manualServices, setManualServices] = useState<ManualService[]>([]);
   const [totalPrice, setTotalPrice] = useState<number>(0);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [newService, setNewService] = useState({ description: '', price: 0 });
 
   useEffect(() => {
@@ -518,20 +519,37 @@ export function WorkOrderDetails() {
                           </p>
                         )}
                       </div>
-                      <button
-                        onClick={async () => {
-                          const updated = manualServices.filter(s => s.id !== service.id);
-                          setManualServices(updated);
-                          if (id) {
-                            await updateDoc(doc(db, 'workOrders', id), {
-                              manualServices: updated,
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setEditingServiceId(service.id);
+                            setNewService({
+                              description: service.description,
+                              price: service.price || 0,
                             });
-                          }
-                        }}
-                        className="text-red-600 hover:text-red-700 p-1"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                            setShowAddServiceModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-700 p-1"
+                          title="Editar serviço"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const updated = manualServices.filter(s => s.id !== service.id);
+                            setManualServices(updated);
+                            if (id) {
+                              await updateDoc(doc(db, 'workOrders', id), {
+                                manualServices: updated,
+                              });
+                            }
+                          }}
+                          className="text-red-600 hover:text-red-700 p-1"
+                          title="Excluir serviço"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </>
@@ -733,15 +751,18 @@ export function WorkOrderDetails() {
           </div>
         </Card>
 
-        {/* Add Service Modal */}
+        {/* Add/Edit Service Modal */}
         {showAddServiceModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <Card className="w-full max-w-md">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-navy">Adicionar Serviço</h2>
+                <h2 className="text-xl font-bold text-navy">
+                  {editingServiceId ? 'Editar Serviço' : 'Adicionar Serviço'}
+                </h2>
                 <button
                   onClick={() => {
                     setShowAddServiceModal(false);
+                    setEditingServiceId(null);
                     setNewService({ description: '', price: 0 });
                   }}
                   className="text-slate-400 hover:text-slate-600"
@@ -760,6 +781,7 @@ export function WorkOrderDetails() {
                     onChange={(e) => setNewService({ ...newService, description: e.target.value })}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                     placeholder="Ex: Troca de roldanas, Limpeza, etc."
+                    autoFocus
                   />
                 </div>
                 <div>
@@ -781,29 +803,54 @@ export function WorkOrderDetails() {
                         alert('Digite a descrição do serviço');
                         return;
                       }
-                      const service: ManualService = {
-                        id: Date.now().toString(),
-                        description: newService.description,
-                        price: newService.price > 0 ? newService.price : undefined,
-                      };
-                      const updated = [...manualServices, service];
-                      setManualServices(updated);
-                      if (id) {
-                        await updateDoc(doc(db, 'workOrders', id), {
-                          manualServices: updated,
-                        });
+                      
+                      if (editingServiceId) {
+                        // Edit existing service
+                        const updated = manualServices.map(s => 
+                          s.id === editingServiceId 
+                            ? {
+                                ...s,
+                                description: newService.description,
+                                price: newService.price > 0 ? newService.price : undefined,
+                              }
+                            : s
+                        );
+                        setManualServices(updated);
+                        if (id) {
+                          await updateDoc(doc(db, 'workOrders', id), {
+                            manualServices: updated,
+                          });
+                        }
+                      } else {
+                        // Add new service
+                        const service: ManualService = {
+                          id: Date.now().toString(),
+                          description: newService.description,
+                          price: newService.price > 0 ? newService.price : undefined,
+                        };
+                        const updated = [...manualServices, service];
+                        setManualServices(updated);
+                        if (id) {
+                          await updateDoc(doc(db, 'workOrders', id), {
+                            manualServices: updated,
+                          });
+                        }
                       }
+                      
+                      // Close modal automatically
                       setShowAddServiceModal(false);
+                      setEditingServiceId(null);
                       setNewService({ description: '', price: 0 });
                     }}
                     className="flex-1"
                   >
-                    Adicionar
+                    {editingServiceId ? 'Salvar' : 'Adicionar'}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => {
                       setShowAddServiceModal(false);
+                      setEditingServiceId(null);
                       setNewService({ description: '', price: 0 });
                     }}
                     className="flex-1"
