@@ -11,7 +11,7 @@ import { ClientForm } from '../components/ClientForm';
 import { MaintenanceCategorySelector } from '../components/MaintenanceCategorySelector';
 import { MaintenanceServiceSelector } from '../components/MaintenanceServiceSelector';
 import { Search, Plus, Square, Wrench, ArrowLeft, ArrowRight, Save, Download, X, Trash2 } from 'lucide-react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { queryWithCompanyId } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -129,16 +129,18 @@ export function QuoteWizard() {
     try {
       const newClientData = {
         ...clientData,
-        companyId: companyId,
-        createdAt: new Date(),
+        companyId: companyId, // MANDATORY: Required by security rules
+        createdAt: serverTimestamp(), // Use serverTimestamp for consistency
       };
+      console.log('Creating client with data:', { ...newClientData, createdAt: '[serverTimestamp]' });
       const docRef = await addDoc(collection(db, 'clients'), newClientData);
       await loadClients();
       setSelectedClientId(docRef.id);
       setShowClientModal(false);
     } catch (error: any) {
       console.error('Error creating client:', error);
-      alert(`Erro ao criar cliente: ${error.message}`);
+      console.error('Client data attempted:', { ...clientData, companyId, createdAt: '[serverTimestamp]' });
+      alert(`Erro ao criar cliente: ${error.message}\n\nVerifique o console para mais detalhes.`);
     }
   };
 
@@ -238,17 +240,24 @@ export function QuoteWizard() {
         status: 'draft',
         warranty: warranty || '',
         observations: observations || '',
-        companyId,
-        createdAt: new Date(),
+        companyId: companyId, // MANDATORY: Required by security rules
+        createdAt: serverTimestamp(), // Use serverTimestamp for consistency
       };
 
-      // Remove any undefined values from quoteData
+      // Remove any undefined values from quoteData (except companyId which must exist)
       Object.keys(quoteData).forEach(key => {
-        if ((quoteData as any)[key] === undefined) {
+        if ((quoteData as any)[key] === undefined && key !== 'companyId') {
           delete (quoteData as any)[key];
         }
       });
 
+      // CRITICAL: Validate companyId before saving
+      if (!quoteData.companyId) {
+        alert('Erro: Empresa não identificada. Por favor, recarregue a página.');
+        return;
+      }
+
+      console.log('Creating quote with data:', { ...quoteData, createdAt: '[serverTimestamp]' });
       await addDoc(collection(db, 'quotes'), quoteData);
       alert('Orçamento salvo com sucesso!');
       navigate('/quotes');

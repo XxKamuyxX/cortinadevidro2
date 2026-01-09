@@ -8,7 +8,7 @@ import { useCompany } from '../hooks/useCompany';
 import { useStorage } from '../hooks/useStorage';
 import { useAuth } from '../contexts/AuthContext';
 import { compressFile } from '../utils/compressImage';
-import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { queryWithCompanyId } from '../lib/queries';
 
@@ -125,16 +125,18 @@ export function CompanySettings() {
         });
         alert('Serviço atualizado com sucesso!');
       } else {
-        // Create new service
-        await addDoc(collection(db, 'services'), {
+        // Create new service - CRITICAL: companyId MUST be in the payload
+        const newServiceData = {
           name: serviceForm.name,
           description: serviceForm.description,
           defaultPrice: serviceForm.defaultPrice,
           type: serviceForm.type,
-          companyId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+          companyId: companyId, // MANDATORY: Required by security rules
+          createdAt: serverTimestamp(), // Use serverTimestamp for consistency
+          updatedAt: serverTimestamp(),
+        };
+        console.log('Creating service with data:', { ...newServiceData, createdAt: '[serverTimestamp]', updatedAt: '[serverTimestamp]' });
+        await addDoc(collection(db, 'services'), newServiceData);
         alert('Serviço criado com sucesso!');
       }
       

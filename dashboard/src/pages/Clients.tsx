@@ -4,7 +4,7 @@ import { Button } from '../components/ui/Button';
 import { Plus, Search, Edit, Trash2, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDocs, addDoc, updateDoc, deleteDoc, doc, collection } from 'firebase/firestore';
+import { getDocs, addDoc, updateDoc, deleteDoc, doc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { ClientForm } from '../components/ClientForm';
 import { queryWithCompanyId } from '../lib/queries';
@@ -94,8 +94,9 @@ export function Clients() {
         const newClientData = {
           ...clientData,
           companyId: companyId, // MANDATORY: Explicitly include companyId
-          createdAt: new Date(),
+          createdAt: serverTimestamp(), // Use serverTimestamp for consistency
         };
+        console.log('Creating client with data:', { ...newClientData, createdAt: '[serverTimestamp]' });
         await addDoc(collection(db, 'clients'), newClientData);
       }
       await loadClients();

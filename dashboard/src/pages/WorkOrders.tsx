@@ -3,7 +3,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { CheckCircle2, Circle, Download, Trash2, Plus, Search, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getDocs, doc, getDoc, deleteDoc, addDoc, collection } from 'firebase/firestore';
+import { getDocs, doc, getDoc, deleteDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Link, useNavigate } from 'react-router-dom';
 import { pdf } from '@react-pdf/renderer';
@@ -86,10 +86,11 @@ export function WorkOrders() {
         status: 'scheduled' as const,
         checklist: [],
         notes: '',
-        companyId: companyId,
-        createdAt: new Date(),
+        companyId: companyId, // MANDATORY: Required by security rules
+        createdAt: serverTimestamp(), // Use serverTimestamp for consistency
       };
 
+      console.log('Creating work order with data:', { ...workOrderData, createdAt: '[serverTimestamp]' });
       const docRef = await addDoc(collection(db, 'workOrders'), workOrderData);
       setShowClientSelector(false);
       setSelectedClientId('');

@@ -13,7 +13,7 @@ import { InstallationItemModal } from '../components/InstallationItemModal';
 import { ClientForm } from '../components/ClientForm';
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { queryWithCompanyId } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
@@ -457,8 +457,8 @@ export function QuoteNew() {
           alert('Erro: companyId não encontrado. Por favor, recarregue a página.');
           return;
         }
-        quoteData.createdAt = new Date();
-        quoteData.companyId = companyId;
+        quoteData.createdAt = serverTimestamp(); // Use serverTimestamp for consistency
+        quoteData.companyId = companyId; // MANDATORY: Required by security rules
       }
 
       // Validate data before saving
@@ -494,9 +494,23 @@ export function QuoteNew() {
             quoteData.companyId = existingData.companyId;
           }
         }
+        // CRITICAL: Ensure companyId is preserved on update
+        if (!quoteData.companyId && existingQuote.exists()) {
+          const existingData = existingQuote.data();
+          quoteData.companyId = existingData.companyId || companyId;
+        }
+        if (!quoteData.companyId) {
+          quoteData.companyId = companyId;
+        }
         await updateDoc(doc(db, 'quotes', id), quoteData);
         alert('Orçamento atualizado com sucesso!');
       } else {
+        // CRITICAL: Validate companyId before creating
+        if (!quoteData.companyId) {
+          alert('Erro: Empresa não identificada. Por favor, recarregue a página.');
+          return;
+        }
+        console.log('Creating quote with data:', { ...quoteData, createdAt: '[serverTimestamp]' });
         await addDoc(collection(db, 'quotes'), quoteData);
         alert('Orçamento salvo com sucesso!');
       }
@@ -540,10 +554,11 @@ export function QuoteNew() {
           completed: false,
         })),
         notes: observations || '',
-        companyId: companyId,
-        createdAt: new Date(),
+        companyId: companyId, // MANDATORY: Required by security rules
+        createdAt: serverTimestamp(), // Use serverTimestamp for consistency
       };
 
+      console.log('Creating work order with data:', { ...workOrderData, createdAt: '[serverTimestamp]' });
       const docRef = await addDoc(collection(db, 'workOrders'), workOrderData);
       alert('Ordem de Serviço criada com sucesso!');
       navigate(`/work-orders/${docRef.id}`);

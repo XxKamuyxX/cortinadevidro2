@@ -3,7 +3,7 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Plus, FileText, ClipboardList, MessageCircle, Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getDocs, addDoc, doc, getDoc, deleteDoc, collection } from 'firebase/firestore';
+import { getDocs, addDoc, doc, getDoc, deleteDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Link, useNavigate } from 'react-router-dom';
 import { DatePickerModal } from '../components/DatePickerModal';
@@ -148,6 +148,11 @@ export function Quotes() {
     if (!selectedQuote || !companyId) return;
 
     try {
+      if (!companyId) {
+        alert('Erro: Empresa não identificada.');
+        return;
+      }
+
       const workOrderData: any = {
         quoteId: selectedQuote.id,
         clientName: selectedQuote.clientName,
@@ -156,10 +161,11 @@ export function Quotes() {
         technician: '',
         status: 'scheduled',
         notes: '',
-        companyId,
-        createdAt: new Date(),
+        companyId: companyId, // MANDATORY: Required by security rules
+        createdAt: serverTimestamp(), // Use serverTimestamp for consistency
       };
 
+      console.log('Creating work order with data:', { ...workOrderData, createdAt: '[serverTimestamp]' });
       await addDoc(collection(db, 'workOrders'), workOrderData);
       alert('Ordem de Serviço criada com sucesso!');
       setShowDatePicker(false);
