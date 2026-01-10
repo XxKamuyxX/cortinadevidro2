@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // --- HELPER FUNCTIONS ---
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -22,24 +22,120 @@ service cloud.firestore {
       return hasCompanyId() ? getUserDoc().data.companyId : null;
     }
     
-    // Helper function for master check (must be at top level)
     function isMaster() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              getUserDoc().data.role == 'master';
     }
     
-    // Users - own document access OR master can read/write all
+    // Helper to check if document belongs to user's company
+    function belongsToMyCompany(resourceId) {
+      return hasCompanyId() && resourceId == getUserCompanyId();
+    }
+
+    // --- USERS ---
     match /users/{userId} {
       // Master can read/write ANY user. Regular users can only read/write their own.
       allow read: if isAuthenticated() && (request.auth.uid == userId || isMaster());
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isMaster());
+      
+      // CREATE: Allow authenticated users to create their own document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // UPDATE: Users can update their own document, BUT BLOCK SENSITIVE FIELDS
+      // Only Admin SDK (backend) can change subscriptionStatus, isActive
+      allow update: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'subscriptionStatus',  // Only backend can change this
+                         'isActive',            // Only backend can change this
+                         'role',                // Users cannot change their own role
+                         'companyId'            // Users cannot change their company
+                       ]);
+      
+      // Master can update any user (for admin operations)
+      allow update: if isMaster();
+      
+      // DELETE: Users cannot delete themselves. Only master can delete users.
+      allow delete: if isMaster();
     }
-    
-    // Clients - CRITICAL: Queries with companyId filter are allowed via allow read
+
+    // --- COMPANIES (CRITICAL: Field-Level Security) ---
+    match /companies/{companyId} {
+      // READ: Authenticated users can read their own company, master can read all
+      allow read: if isAuthenticated() && 
+                     (belongsToMyCompany(resource.id) || isMaster());
+      
+      // CREATE: Allow authenticated users to create their own company
+      allow create: if isAuthenticated() && 
+                       hasCompanyId() && 
+                       belongsToMyCompany(request.resource.id);
+      
+      // UPDATE: Allow owner, BUT BLOCK SENSITIVE FIELDS
+      // Only Admin SDK (backend/webhook) can change: wallet, subscriptionStatus, stripeCustomerId, etc.
+      allow update: if isAuthenticated() && 
+                       belongsToMyCompany(resource.id) &&
+                       belongsToMyCompany(request.resource.id) &&
+                       // CRITICAL: Block users from changing sensitive financial/affiliate fields
+                       !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                         'wallet',              // User cannot change their balance
+                         'subscriptionStatus',  // User cannot fake being active (if stored here)
+                         'stripeCustomerId',    // User cannot mess with Stripe ID
+                         'affiliateCode',       // User cannot change their code manually
+                         'referralStats',       // User cannot fake referral counts
+                         'firstMonthDiscount',  // User cannot give themselves discount
+                         'discountExpirationDate', // User cannot extend discount
+                         'referredBy',          // User cannot change who referred them
+                         'lastPaymentDate'      // User cannot fake payment dates
+                       ]);
+      
+      // MASTER: Can update any company (including sensitive fields for admin operations)
+      allow update: if isMaster();
+      
+      // DELETE: Only master can delete companies
+      allow delete: if isMaster();
+    }
+
+    // --- REFERRAL LEDGER (Commission History) ---
+    match /referral_ledger/{ledgerId} {
+      // READ: Users can see their own referral ledger entries (where they are the referrer)
+      allow read: if isAuthenticated() && 
+                     hasCompanyId() && 
+                     resource.data.referrerId == getUserCompanyId();
+      
+      // Master can read all referral ledger entries
+      allow read: if isMaster();
+      
+      // WRITE: DENY ALL (Only Backend/Admin SDK can write commissions)
+      // The webhook handler and commission processing functions use Admin SDK
+      allow create, update, delete: if false;
+    }
+
+    // --- PAYOUT REQUESTS (Withdrawals) ---
+    match /payout_requests/{requestId} {
+      // READ: User sees own requests, Master sees all
+      allow read: if isAuthenticated() && 
+                     ((hasCompanyId() && resource.data.companyId == getUserCompanyId()) || isMaster());
+      
+      // CREATE: User can create their own payout requests (with validation)
+      allow create: if isAuthenticated() && 
+                       hasCompanyId() && 
+                       request.resource.data.companyId == getUserCompanyId() &&
+                       request.resource.data.status == 'pending' &&  // Must start as pending
+                       request.resource.data.amount is number &&
+                       request.resource.data.pixKey is string;
+
+      // UPDATE: User CANNOT update (only Master/Admin SDK marks as paid)
+      // Master can update to change status to 'paid' or 'rejected'
+      allow update: if isMaster();
+      
+      // DELETE: No delete allowed (audit trail)
+      allow delete: if false;
+    }
+
+    // --- CLIENTS ---
     match /clients/{clientId} {
       allow read: if isAuthenticated() && 
-                     hasCompanyId() &&
+                     hasCompanyId() && 
                      resource.data.companyId == getUserCompanyId();
       allow create: if isAuthenticated() && 
                        hasCompanyId() && 
@@ -52,25 +148,8 @@ service cloud.firestore {
                        hasCompanyId() && 
                        resource.data.companyId == getUserCompanyId();
     }
-    
-    // Companies - own company document OR master can read/write all
-    match /companies/{companyId} {
-      // Master can read/write any company. Regular users can only access their own.
-      allow read: if isAuthenticated() && 
-                     ((hasCompanyId() && resource.id == getUserCompanyId()) || isMaster());
-      allow create: if isAuthenticated() && 
-                       hasCompanyId() && 
-                       request.resource.id == getUserCompanyId();
-      allow update: if isAuthenticated() && 
-                       ((hasCompanyId() && 
-                         resource.id == getUserCompanyId() &&
-                         request.resource.id == getUserCompanyId()) || isMaster());
-      allow delete: if isAuthenticated() && 
-                       hasCompanyId() && 
-                       resource.id == getUserCompanyId();
-    }
-    
-    // Work Orders - Public read and approval allowed
+
+    // --- WORK ORDERS ---
     match /workOrders/{workOrderId} {
       // Public read access (for sharing links)
       allow read: if true;
@@ -96,8 +175,8 @@ service cloud.firestore {
                        hasCompanyId() && 
                        resource.data.companyId == getUserCompanyId();
     }
-    
-    // Expenses
+
+    // --- EXPENSES ---
     match /expenses/{expenseId} {
       allow read: if isAuthenticated() && 
                      hasCompanyId() && 
@@ -113,8 +192,8 @@ service cloud.firestore {
                        hasCompanyId() && 
                        resource.data.companyId == getUserCompanyId();
     }
-    
-    // Quotes
+
+    // --- QUOTES ---
     match /quotes/{quoteId} {
       allow read: if true;
       allow create: if isAuthenticated() && 
@@ -131,8 +210,8 @@ service cloud.firestore {
                        hasCompanyId() && 
                        resource.data.companyId == getUserCompanyId();
     }
-    
-    // Receipts
+
+    // --- RECEIPTS ---
     match /receipts/{receiptId} {
       allow read: if true;
       allow create: if isAuthenticated() && 
@@ -146,13 +225,13 @@ service cloud.firestore {
                        hasCompanyId() && 
                        resource.data.companyId == getUserCompanyId();
     }
-    
-    // Settings
+
+    // --- SETTINGS ---
     match /settings/{document=**} {
       allow read, write: if isAuthenticated();
     }
-    
-    // Templates
+
+    // --- TEMPLATES ---
     match /templates/{templateId} {
       // All authenticated users can read templates
       allow read: if isAuthenticated();
@@ -160,69 +239,22 @@ service cloud.firestore {
       // Only master can create/update/delete templates
       allow create, update, delete: if isMaster();
     }
-    
-        // Services
-        match /services/{serviceId} {
-          allow read: if isAuthenticated() && 
-                         hasCompanyId() && 
-                         resource.data.companyId == getUserCompanyId();
-          allow create: if isAuthenticated() && 
-                           hasCompanyId() && 
-                           request.resource.data.companyId == getUserCompanyId();
-          allow update: if isAuthenticated() && 
-                           hasCompanyId() && 
-                           resource.data.companyId == getUserCompanyId() &&
-                           request.resource.data.companyId == getUserCompanyId();
-          allow delete: if isAuthenticated() && 
-                           hasCompanyId() && 
-                           resource.data.companyId == getUserCompanyId();
-        }
-        
-        // Referral Ledger - Commission tracking
-        match /referral_ledger/{ledgerId} {
-          // Users can read their own referral ledger entries (where they are the referrer)
-          allow read: if isAuthenticated() && 
-                         hasCompanyId() && 
-                         resource.data.referrerId == getUserCompanyId();
-          
-          // Only server/admin can create ledger entries (via processPaymentCommission)
-          allow create: if isAuthenticated() && 
-                           hasCompanyId() && 
-                           request.resource.data.referrerId == getUserCompanyId();
-          
-          // Users can update their own ledger entries for status changes (pending -> released -> paid)
-          allow update: if isAuthenticated() && 
-                           hasCompanyId() && 
-                           resource.data.referrerId == getUserCompanyId() &&
-                           request.resource.data.referrerId == getUserCompanyId() &&
-                           // Only allow updating status, releasedAt, and paidAt fields
-                           request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(['status', 'releasedAt', 'paidAt', 'updatedAt']);
-          
-          // No delete allowed for ledger entries (audit trail)
-          allow delete: if false;
-        }
-        
-        // Payout Requests - Withdrawal requests from affiliates
-        match /payout_requests/{requestId} {
-          // Users can read their own payout requests
-          allow read: if isAuthenticated() && 
-                         ((hasCompanyId() && resource.data.companyId == getUserCompanyId()) || isMaster());
-          
-          // Users can create their own payout requests
-          allow create: if isAuthenticated() && 
-                           hasCompanyId() && 
-                           request.resource.data.companyId == getUserCompanyId() &&
-                           request.resource.data.status == 'pending' &&
-                           request.resource.data.amount is number &&
-                           request.resource.data.pixKey is string;
-          
-          // Master can update any payout request (to approve/pay/reject)
-          // Users cannot update their own requests
-          allow update: if isMaster();
-          
-          // No delete allowed (audit trail)
-          allow delete: if false;
-        }
-      }
+
+    // --- SERVICES ---
+    match /services/{serviceId} {
+      allow read: if isAuthenticated() && 
+                     hasCompanyId() && 
+                     resource.data.companyId == getUserCompanyId();
+      allow create: if isAuthenticated() && 
+                       hasCompanyId() && 
+                       request.resource.data.companyId == getUserCompanyId();
+      allow update: if isAuthenticated() && 
+                       hasCompanyId() && 
+                       resource.data.companyId == getUserCompanyId() &&
+                       request.resource.data.companyId == getUserCompanyId();
+      allow delete: if isAuthenticated() && 
+                       hasCompanyId() && 
+                       resource.data.companyId == getUserCompanyId();
     }
+  }
+}
