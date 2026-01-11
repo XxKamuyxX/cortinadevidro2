@@ -3,9 +3,10 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, collection, deleteDoc, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Edit } from 'lucide-react';
+import { X, Plus, Copy, ExternalLink, FileText, ClipboardCheck, Trash2, Edit, Calendar, Clock, User } from 'lucide-react';
+import { queryWithCompanyId } from '../lib/queries';
 import { ImageUpload } from '../components/ImageUpload';
 import { TechnicalInspection } from '../components/TechnicalInspection';
 import { WhatsAppButton } from '../components/WhatsAppButton';
@@ -1059,6 +1060,93 @@ export function WorkOrderDetails() {
           </div>
         )}
       </div>
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200">
+              <h2 className="text-2xl font-bold text-navy flex items-center gap-2">
+                <Calendar className="w-6 h-6" />
+                Agendar Execução
+              </h2>
+              <Button variant="ghost" size="sm" onClick={() => setShowScheduleModal(false)}>
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-2" />
+                  Data
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <Clock className="w-4 h-4 inline mr-2" />
+                  Horário
+                </label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <User className="w-4 h-4 inline mr-2" />
+                  Técnico
+                </label>
+                {loadingTechnicians ? (
+                  <p className="text-sm text-slate-500 py-2">Carregando técnicos...</p>
+                ) : (
+                  <select
+                    value={selectedTechnicianId}
+                    onChange={(e) => setSelectedTechnicianId(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  >
+                    <option value="">Selecione um técnico (opcional)</option>
+                    {technicians.map((tech) => (
+                      <option key={tech.id} value={tech.id}>
+                        {tech.name} ({tech.email})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setShowScheduleModal(false)}
+                  disabled={saving}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleScheduleSubmit}
+                  disabled={saving || !scheduleDate}
+                >
+                  {saving ? 'Salvando...' : 'Salvar Agendamento'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </Layout>
   );
 }

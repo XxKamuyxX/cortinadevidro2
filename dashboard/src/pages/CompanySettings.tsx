@@ -48,15 +48,18 @@ export function CompanySettings() {
     description: string;
     defaultPrice: number;
     type: 'unit' | 'meter' | 'package';
+    category?: 'instalacao' | 'manutencao';
   }>>([]);
   const [showServiceModal, setShowServiceModal] = useState(false);
-  const [editingService, setEditingService] = useState<{ id: string; name: string; description: string; defaultPrice: number; type: 'unit' | 'meter' | 'package' } | null>(null);
+  const [editingService, setEditingService] = useState<{ id: string; name: string; description: string; defaultPrice: number; type: 'unit' | 'meter' | 'package'; category?: 'instalacao' | 'manutencao' } | null>(null);
   const [serviceForm, setServiceForm] = useState({
     name: '',
     description: '',
     defaultPrice: 0,
     type: 'unit' as 'unit' | 'meter' | 'package',
+    category: 'manutencao' as 'instalacao' | 'manutencao',
   });
+  const [serviceFilter, setServiceFilter] = useState<'all' | 'instalacao' | 'manutencao'>('all');
 
   useEffect(() => {
     if (company) {
@@ -146,6 +149,7 @@ export function CompanySettings() {
           description: serviceForm.description,
           defaultPrice: serviceForm.defaultPrice,
           type: serviceForm.type,
+          category: serviceForm.category,
           companyId: companyId, // MANDATORY: Required by security rules
           createdAt: serverTimestamp(), // Use serverTimestamp for consistency
           updatedAt: serverTimestamp(),
@@ -157,7 +161,7 @@ export function CompanySettings() {
       
       setShowServiceModal(false);
       setEditingService(null);
-      setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+      setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit', category: 'manutencao' });
       loadServices();
     } catch (error) {
       console.error('Error saving service:', error);
@@ -172,6 +176,7 @@ export function CompanySettings() {
       description: service.description,
       defaultPrice: service.defaultPrice,
       type: service.type,
+      category: service.category || 'manutencao',
     });
     setShowServiceModal(true);
   };
@@ -769,7 +774,7 @@ export function CompanySettings() {
               size="sm"
               onClick={() => {
                 setEditingService(null);
-                setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+                setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit', category: 'manutencao' });
                 setShowServiceModal(true);
               }}
               className="flex items-center gap-2"
@@ -778,14 +783,56 @@ export function CompanySettings() {
               Adicionar Serviço
             </Button>
           </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-slate-200">
+            <button
+              onClick={() => setServiceFilter('all')}
+              className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                serviceFilter === 'all'
+                  ? 'border-navy text-navy'
+                  : 'border-transparent text-slate-600 hover:text-navy'
+              }`}
+            >
+              Todos ({services.length})
+            </button>
+            <button
+              onClick={() => setServiceFilter('instalacao')}
+              className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                serviceFilter === 'instalacao'
+                  ? 'border-navy text-navy'
+                  : 'border-transparent text-slate-600 hover:text-navy'
+              }`}
+            >
+              Instalação ({services.filter(s => s.category === 'instalacao').length})
+            </button>
+            <button
+              onClick={() => setServiceFilter('manutencao')}
+              className={`px-4 py-2 font-medium text-sm transition-colors border-b-2 ${
+                serviceFilter === 'manutencao'
+                  ? 'border-navy text-navy'
+                  : 'border-transparent text-slate-600 hover:text-navy'
+              }`}
+            >
+              Manutenção ({services.filter(s => s.category === 'manutencao').length})
+            </button>
+          </div>
           
-          {services.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">
-              Nenhum serviço cadastrado. Clique em "Adicionar Serviço" para começar.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {services.map((service) => (
+          {(() => {
+            const filteredServices = serviceFilter === 'all' 
+              ? services 
+              : services.filter(s => s.category === serviceFilter);
+            
+            return filteredServices.length === 0 ? (
+              <p className="text-center text-slate-500 py-8">
+                {serviceFilter === 'all' 
+                  ? 'Nenhum serviço cadastrado. Clique em "Adicionar Serviço" para começar.'
+                  : `Nenhum serviço de ${serviceFilter === 'instalacao' ? 'instalação' : 'manutenção'} cadastrado.`
+                }
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredServices.map((service) => (
                 <div
                   key={service.id}
                   className="p-4 border border-slate-200 rounded-lg bg-slate-50 flex justify-between items-start"
@@ -977,7 +1024,7 @@ Testemunhas:
                   onClick={() => {
                     setShowServiceModal(false);
                     setEditingService(null);
-                    setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+                    setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit', category: 'manutencao' });
                   }}
                 >
                   <X className="w-5 h-5" />
@@ -1029,6 +1076,20 @@ Testemunhas:
                     </select>
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Categoria *
+                  </label>
+                  <select
+                    value={serviceForm.category}
+                    onChange={(e) => setServiceForm({ ...serviceForm, category: e.target.value as 'instalacao' | 'manutencao' })}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  >
+                    <option value="manutencao">Manutenção</option>
+                    <option value="instalacao">Instalação</option>
+                  </select>
+                </div>
                 
                 <div className="flex gap-2 pt-4">
                   <Button
@@ -1037,7 +1098,7 @@ Testemunhas:
                     onClick={() => {
                       setShowServiceModal(false);
                       setEditingService(null);
-                      setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit' });
+                      setServiceForm({ name: '', description: '', defaultPrice: 0, type: 'unit', category: 'manutencao' });
                     }}
                     className="flex-1"
                   >
