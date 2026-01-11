@@ -255,25 +255,6 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
-              {!isMaster && navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    id={item.path === '/settings' ? 'settings-link' : undefined}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                      isActive(item.path)
-                        ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-md shadow-primary/20'
-                        : 'text-slate-700 hover:bg-glass-blue'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
               <button
                 onClick={handleSignOut}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors"

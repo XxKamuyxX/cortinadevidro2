@@ -18,7 +18,7 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Public Header / Navbar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+      <header className="fixed top-0 w-full z-50 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             {/* Logo - Left */}
@@ -90,27 +90,27 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
       </main>
 
       {/* Public Footer */}
-      <footer className="bg-slate-900 text-white mt-20">
+      <footer className="bg-slate-100 text-slate-700 mt-20">
         <div className="container mx-auto px-4 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             {/* Brand */}
             <div>
-              <h3 className="text-xl font-bold mb-4 bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+              <h3 className="text-xl font-bold mb-4 bg-gradient-to-r from-navy to-primary bg-clip-text text-transparent">
                 Gestor Vítreo
               </h3>
-              <p className="text-sm text-slate-400 mb-4">
+              <p className="text-sm text-slate-600 mb-4">
                 Sistema de gestão completo para vidraceiros e prestadores de serviços. Gerencie clientes, orçamentos e ordens de serviço de forma profissional.
               </p>
             </div>
 
             {/* Product */}
             <div>
-              <h4 className="font-semibold text-white mb-4">Produto</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
+              <h4 className="font-semibold text-slate-800 mb-4">Produto</h4>
+              <ul className="space-y-2 text-sm text-slate-600">
                 <li>
                   <a 
                     href="#features" 
-                    className="hover:text-white transition-colors"
+                    className="hover:text-navy transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       const element = document.getElementById('features');
@@ -123,7 +123,7 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
                 <li>
                   <a 
                     href="#pricing" 
-                    className="hover:text-white transition-colors"
+                    className="hover:text-navy transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       const element = document.getElementById('pricing');
@@ -133,11 +133,11 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
                     Planos
                   </a>
                 </li>
-                <li><Link to="/signup" className="hover:text-white transition-colors">Teste Grátis</Link></li>
+                <li><Link to="/signup" className="hover:text-navy transition-colors">Teste Grátis</Link></li>
                 <li>
                   <a 
                     href="#faq" 
-                    className="hover:text-white transition-colors"
+                    className="hover:text-navy transition-colors"
                     onClick={(e) => {
                       e.preventDefault();
                       const element = document.getElementById('faq');
@@ -152,27 +152,27 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
             {/* Company */}
             <div>
-              <h4 className="font-semibold text-white mb-4">Empresa</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li><Link to="/#about" className="hover:text-white transition-colors">Sobre Nós</Link></li>
-                <li><Link to="/#contact" className="hover:text-white transition-colors">Contato</Link></li>
-                <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+              <h4 className="font-semibold text-slate-800 mb-4">Empresa</h4>
+              <ul className="space-y-2 text-sm text-slate-600">
+                <li><Link to="/#about" className="hover:text-navy transition-colors">Sobre Nós</Link></li>
+                <li><Link to="/#contact" className="hover:text-navy transition-colors">Contato</Link></li>
+                <li><Link to="/blog" className="hover:text-navy transition-colors">Blog</Link></li>
               </ul>
             </div>
 
             {/* Support */}
             <div>
-              <h4 className="font-semibold text-white mb-4">Suporte</h4>
-              <ul className="space-y-3 text-sm text-slate-400">
+              <h4 className="font-semibold text-slate-800 mb-4">Suporte</h4>
+              <ul className="space-y-3 text-sm text-slate-600">
                 <li className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  <a href="mailto:suporte@gestorvitreo.com.br" className="hover:text-white transition-colors">
+                  <a href="mailto:suporte@gestorvitreo.com.br" className="hover:text-navy transition-colors">
                     suporte@gestorvitreo.com.br
                   </a>
                 </li>
                 <li className="flex items-center gap-2">
                   <Phone className="w-4 h-4" />
-                  <a href="tel:+5531972224582" className="hover:text-white transition-colors">
+                  <a href="tel:+5531972224582" className="hover:text-navy transition-colors">
                     (31) 97222-4582
                   </a>
                 </li>
@@ -181,14 +181,14 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
           </div>
 
           {/* Bottom Bar */}
-          <div className="border-t border-slate-800 pt-8 mt-8">
+          <div className="border-t border-slate-300 pt-8 mt-8">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-slate-600">
                 &copy; {new Date().getFullYear()} Gestor Vítreo. Todos os direitos reservados.
               </p>
-              <div className="flex gap-6 text-sm text-slate-400">
-                <Link to="/privacy" className="hover:text-white transition-colors">Privacidade</Link>
-                <Link to="/terms" className="hover:text-white transition-colors">Termos de Uso</Link>
+              <div className="flex gap-6 text-sm text-slate-600">
+                <Link to="/privacy" className="hover:text-navy transition-colors">Privacidade</Link>
+                <Link to="/terms" className="hover:text-navy transition-colors">Termos de Uso</Link>
               </div>
             </div>
           </div>

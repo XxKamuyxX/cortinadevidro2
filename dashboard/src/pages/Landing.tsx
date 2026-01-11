@@ -854,13 +854,15 @@ export function Landing() {
                 </ul>
 
                 <Link to="/signup">
-                  <Button
-                    size="lg"
-                    className="w-full bg-white text-blue-600 hover:bg-blue-50 font-semibold text-lg py-4 border-2 border-white"
-                    style={{ color: '#1e40af' }}
-                  >
-                    Começar Teste Grátis
-                  </Button>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      size="lg"
+                      className="w-full bg-white text-blue-600 hover:bg-blue-50 font-semibold text-lg py-4 border-2 border-white"
+                      style={{ color: '#1e40af' }}
+                    >
+                      Começar Teste Grátis
+                    </Button>
+                  </motion.div>
                 </Link>
 
                 <div className="flex flex-wrap gap-4 justify-center mt-6 text-sm">
