@@ -2,11 +2,13 @@
 
 ## ✅ Configuração Atual
 
-Este projeto usa **Vercel Auto-Detection** (zero configuração).
+Este projeto usa **Vercel Auto-Detection** com configuração mínima para SPA routing.
 
-### Arquivos Removidos
+### Arquivo `vercel.json`
 
-- ❌ `vercel.json` - Removido (causava erro "Function Runtimes must have a valid version")
+- ✅ `vercel.json` - Configurado para SPAs (React Router)
+  - Rewrites todas as rotas (exceto `/api/*` e arquivos estáticos) para `index.html`
+  - Permite que o React Router funcione corretamente no Vercel
 
 ### Auto-Detection
 
@@ -56,7 +58,8 @@ Se você precisar configurar runtime específico no futuro, crie `vercel.json` n
 
 ## ✅ Status
 
-- ✅ `vercel.json` removido
+- ✅ `vercel.json` configurado para SPA routing
 - ✅ `package.json` sem `engines`
 - ✅ Vercel auto-detection habilitado
 - ✅ API routes funcionando
+- ✅ React Router funcionando corretamente (sem erros 404)
